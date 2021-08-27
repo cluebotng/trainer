@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 
 async def fetch_reviewed_edits(session):
-    logger.info(f'Fetching completed edits from review interface')
+    logger.info('Fetching completed edits from review interface')
     async with session.get('http://localhost:8080/api/export/done.json') as r:
         data = await r.json()
 

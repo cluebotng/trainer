@@ -74,7 +74,11 @@ class Edit:
         ElementTree.SubElement(edit, 'comment').text = self.comment
 
         if hasattr(self, 'is_vandalism'):
-            ElementTree.SubElement(edit, 'isvandalism').text = ('true' if getattr(self, 'is_vandalism') else 'false')
+            ElementTree.SubElement(edit, 'isvandalism').text = (
+                'true'
+                if getattr(self, 'is_vandalism') else
+                'false'
+            )
 
         ElementTree.SubElement(edit, 'user').text = self.user.name
         ElementTree.SubElement(edit, 'user_edit_count').text = f'{self.user.edit_count}'
@@ -89,10 +93,15 @@ class Edit:
         ElementTree.SubElement(common, 'namespace').text = self.page.namespace
         ElementTree.SubElement(common, 'creator').text = self.page.creator
         ElementTree.SubElement(common, 'num_recent_edits').text = f'{self.page.recent_edit_count}'
-        ElementTree.SubElement(common, 'num_recent_reversions').text = f'{self.page.recent_reversion_count}'
+        ElementTree.SubElement(common,
+                               'num_recent_reversions').text = f'{self.page.recent_reversion_count}'
 
         current = ElementTree.SubElement(edit, 'current')
-        ElementTree.SubElement(current, 'minor').text = 'true' if self.current_diff.minor else 'false'
+        ElementTree.SubElement(current, 'minor').text = (
+            'true'
+            if self.current_diff.minor else
+            'false'
+        )
         ElementTree.SubElement(current, 'timestamp').text = f'{self.current_diff.timestamp}'
         ElementTree.SubElement(current, 'text').text = self.current_diff.text
 

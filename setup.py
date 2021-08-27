@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 '''
-continuous-trainer - ClueBot NG continuous trainer
-
 MIT License
 
 Copyright (c) 2021 Damian Zaremba

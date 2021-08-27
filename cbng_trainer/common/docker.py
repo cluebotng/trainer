@@ -99,19 +99,24 @@ WORKDIR /opt/cbng-core
 RUN apt-get update && apt-get install -y wget && apt-get clean
 
 RUN mkdir -p /opt/cbng-core
-RUN wget -O /opt/cbng-core/cluebotng https://github.com/cluebotng/core/releases/download/${CORE_TAG}/cluebotng
+RUN wget -O /opt/cbng-core/cluebotng \
+    https://github.com/cluebotng/core/releases/download/${CORE_TAG}/cluebotng
 RUN chmod 755 /opt/cbng-core/cluebotng
 
-RUN wget -O /opt/cbng-core/create_ann https://github.com/cluebotng/core/releases/download/${CORE_TAG}/create_ann
+RUN wget -O /opt/cbng-core/create_ann \
+    https://github.com/cluebotng/core/releases/download/${CORE_TAG}/create_ann
 RUN chmod 755 /opt/cbng-core/create_ann
 
-RUN wget -O /opt/cbng-core/create_bayes_db https://github.com/cluebotng/core/releases/download/${CORE_TAG}/create_bayes_db
+RUN wget -O /opt/cbng-core/create_bayes_db \
+    https://github.com/cluebotng/core/releases/download/${CORE_TAG}/create_bayes_db
 RUN chmod 755 /opt/cbng-core/create_bayes_db
 
-RUN wget -O /opt/cbng-core/print_bayes_db https://github.com/cluebotng/core/releases/download/${CORE_TAG}/print_bayes_db
+RUN wget -O /opt/cbng-core/print_bayes_db \
+    https://github.com/cluebotng/core/releases/download/${CORE_TAG}/print_bayes_db
 RUN chmod 755 /opt/cbng-core/print_bayes_db
 
-RUN wget -O conf.tar.gz https://github.com/cluebotng/core/releases/download/${CORE_TAG}/conf.tar.gz
+RUN wget -O conf.tar.gz \
+    https://github.com/cluebotng/core/releases/download/${CORE_TAG}/conf.tar.gz
 RUN tar -C /opt/cbng-core -xvf conf.tar.gz && rm -f conf.tar.gz
 
 # Lame hack to avoid issues trying to clear the non-existant tty
@@ -129,9 +134,12 @@ ADD main_ann.fann /opt/cbng-core/data/main_ann.db
     else:
         docker_file += '''
 # Release database
-RUN wget -O /opt/cbng-core/data/bayes.db https://github.com/cluebotng/core/releases/download/${CORE_TAG}/bayes.db
-RUN wget -O /opt/cbng-core/data/two_bayes.db https://github.com/cluebotng/core/releases/download/${CORE_TAG}/two_bayes.db
-RUN wget -O /opt/cbng-core/data/main_ann.fann https://github.com/cluebotng/core/releases/download/${CORE_TAG}/main_ann.fann
+RUN wget -O /opt/cbng-core/data/bayes.db \
+    https://github.com/cluebotng/core/releases/download/${CORE_TAG}/bayes.db
+RUN wget -O /opt/cbng-core/data/two_bayes.db \
+    https://github.com/cluebotng/core/releases/download/${CORE_TAG}/two_bayes.db
+RUN wget -O /opt/cbng-core/data/main_ann.fann \
+    https://github.com/cluebotng/core/releases/download/${CORE_TAG}/main_ann.fann
 '''
 
     image_tag = f'cbng/core/{uuid.uuid4()}'

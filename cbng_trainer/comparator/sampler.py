@@ -61,12 +61,18 @@ async def build_edit_from_revision_id(session, rev_id: int):
     revisions = api_data['query']['pages'][extended_data['page']['id']]['revisions']
 
     assert revisions[0]['revid'] == extended_data['current']['id']
-    extended_data['current']['text'] = revisions[0]['slots']['main']['*'] if '*' in revisions[0]['slots'][
-        'main'] else ''
+    extended_data['current']['text'] = (
+        revisions[0]['slots']['main']['*']
+        if '*' in revisions[0]['slots']['main'] else
+        ''
+    )
 
     assert revisions[1]['revid'] == extended_data['previous']['id']
-    extended_data['previous']['text'] = revisions[1]['slots']['main']['*'] if '*' in revisions[1]['slots'][
-        'main'] else ''
+    extended_data['previous']['text'] = (
+        revisions[1]['slots']['main']['*']
+        if '*' in revisions[1]['slots']['main'] else
+        ''
+    )
 
     return Edit(
         extended_data['current']['id'],
