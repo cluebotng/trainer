@@ -165,4 +165,5 @@ RUN wget -O /opt/cbng-core/data/main_ann.fann \
     if p.returncode != 0:
         raise RuntimeError(f'Failed to build docker image: {stdout} / {stderr}')
 
+    (path / 'Dockerfile').unlink(True)
     return image_tag
