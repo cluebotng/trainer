@@ -113,3 +113,19 @@ class CoreScore:
     id: int
     score: float
     think_vandalism: bool
+
+
+@dataclasses.dataclass(frozen=True, repr=True)
+class Enquiry:
+    edit: Edit
+    dataset: str
+    is_vandalism: Optional[bool]
+
+
+@dataclasses.dataclass(frozen=True, repr=True)
+class EnquiryResult:
+    enquiry: Enquiry
+    base_result: CoreScore
+    target_result: CoreScore
+    results_match: bool
+    expected_match: bool

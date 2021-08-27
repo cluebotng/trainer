@@ -30,6 +30,47 @@ from pathlib import PosixPath
 logger = logging.getLogger(__name__)
 
 
+def stop_container(name: str):
+    logger.info(f'Asking docker to kill {name}')
+    p = subprocess.Popen([
+        'docker',
+        'kill',
+        name
+    ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE)
+    stdout, stderr = p.communicate()
+    if p.returncode != 0:
+        raise RuntimeError(f'Failed to stop container {name}: {stdout} / {stderr}')
+    return True
+
+
+def start_container(image: str, port: int):
+    container_name = f'cbng-core-{uuid.uuid4()}'
+    logger.info(f'Asking docker to start {container_name} from {image} using {port}')
+    p = subprocess.Popen([
+        'docker',
+        'run',
+        '--rm',
+        '-d',
+        '--name',
+        container_name,
+        '-p',
+        f'127.0.0.1:{port}:3565',
+        image,
+        "/opt/cbng-core/cluebotng",
+        "-l",
+        "-m",
+        "live_run"
+    ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE)
+    stdout, stderr = p.communicate()
+    if p.returncode != 0:
+        raise RuntimeError(f'Failed to start container {image}: {stdout} / {stderr}')
+    return container_name
+
+
 def run_container(image: str, volumes, arguments):
     logger.info(f'Asking docker to run {image} using {volumes} / {arguments}')
 

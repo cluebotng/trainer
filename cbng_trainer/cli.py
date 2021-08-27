@@ -26,11 +26,16 @@ SOFTWARE.
 import asyncio
 import logging
 import sys
+import tempfile
 from pathlib import PosixPath
 
 import click
 
-from cbng_trainer.common.docker import build_docker_image, run_container
+from cbng_trainer.common.docker import (build_docker_image,
+                                        start_container,
+                                        stop_container,
+                                        run_container)
+from cbng_trainer.comparator.comparator import compare_samples
 from cbng_trainer.trainer.reviewed import dump_reviewed_edits
 
 logger = logging.getLogger(__name__)
@@ -87,6 +92,32 @@ def build_database(input, output, release_tag):
                            ['/opt/cbng-core/create_ann', 'data/main_ann.fann', 'data/main_ann_train.dat', '150', '0.25',
                             '162'])
     logger.info(f'Finished create_ann main_ann.fann: {stdout.decode("utf-8")}')
+
+
+@cli.command()
+@click.option('--target', help='Target binaries path', required=True, type=click.Path(True))
+@click.option('--release-tag', help='Git release tag', required=True, default='v1.0.2')
+def compare_database(target, release_tag):
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        base_image = build_docker_image(PosixPath(tmp_dir), release_tag)
+    target_image = build_docker_image(PosixPath(target), release_tag, True)
+
+    base_container = start_container(base_image, 3501)
+    target_container = start_container(target_image, 3502)
+
+    try:
+        loop = asyncio.get_event_loop()
+        results = loop.run_until_complete(compare_samples(3501, 3502))
+    except Exception as e:
+        raise e
+    else:
+        click.echo('Dumping results to stdout....')
+        for result in results:
+            print(result)
+
+    finally:
+        stop_container(base_container)
+        stop_container(target_container)
 
 
 if __name__ == '__main__':
