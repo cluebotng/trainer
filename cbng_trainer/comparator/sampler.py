@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 async def build_edit_from_revision_id(session, rev_id: int):
     logger.info(f'Fetching training data for {rev_id}')
-    async with session.get('http://localhost:8081/api/', params={
+    async with session.get('https://cluebotng.toolforge.org/api/', params={
         'action': 'training.data',
         'rev_id': rev_id,
     }) as r:
@@ -70,7 +70,8 @@ async def build_edit_from_revision_id(session, rev_id: int):
     assert revisions[1]['revid'] == extended_data['previous']['id']
     extended_data['previous']['text'] = (
         revisions[1]['slots']['main']['*']
-        if '*' in revisions[1]['slots']['main'] else
+        if '*' in revisions[1]['slots']['main']
+        else
         ''
     )
 
@@ -114,7 +115,7 @@ async def build_edit_from_revision_id(session, rev_id: int):
 
 async def load_reviewed_vandalism(session):
     samples = []
-    async with session.get('http://localhost:8081/api/', params={
+    async with session.get('https://cluebotng.toolforge.org/api/', params={
         'action': 'reports.list',
         'status': 8,
         'limit': 10,
@@ -132,7 +133,7 @@ async def load_reviewed_vandalism(session):
 
 async def load_reviewed_constructive(session):
     samples = []
-    async with session.get('http://localhost:8081/api/', params={
+    async with session.get('https://cluebotng.toolforge.org/api/', params={
         'action': 'reports.list',
         'status': 7,
         'limit': 10,
@@ -150,7 +151,7 @@ async def load_reviewed_constructive(session):
 
 async def load_reported_pending(session):
     samples = []
-    async with session.get('http://localhost:8081/api/', params={
+    async with session.get('https://cluebotng.toolforge.org/api/', params={
         'action': 'reports.list',
         'status': 6,
         'limit': 10,
@@ -168,7 +169,7 @@ async def load_reported_pending(session):
 
 async def load_random(session):
     samples = []
-    async with session.get('http://localhost:8081/api/', params={
+    async with session.get('https://cluebotng.toolforge.org/api/', params={
         'action': 'edits.list',
         'limit': 10,
         'random': 1,

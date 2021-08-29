@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 async def fetch_reviewed_edits(session):
     logger.info('Fetching completed edits from review interface')
-    async with session.get('http://localhost:8080/api/export/done.json') as r:
+    async with session.get('https://cluebotng-review.toolforge.org/api/export/done.json') as r:
         data = await r.json()
 
     for edit_group in data['EditGroups']:
@@ -53,7 +53,7 @@ async def fetch_edit_contents(session, rev_id):
 
 async def fetch_edit_data(session, rev_id):
     logger.info(f'Fetching extended edit info for {rev_id}')
-    async with session.get('http://localhost:8081/api/', params={
+    async with session.get('https://cluebotng.toolforge.org/api/', params={
         'action': 'training.data',
         'rev_id': rev_id,
     }) as r:
