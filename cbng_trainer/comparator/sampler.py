@@ -124,7 +124,7 @@ async def load_reviewed_vandalism(session):
         reports = await r.json()
         for report in reports.values():
             if report['revid'] is None:
-                print(report)
+                logger.warning(report)
             edit = await build_edit_from_revision_id(session, report['revid'])
             if edit:
                 samples.append(Enquiry(edit, "reviewed-vandalism", True))
@@ -142,7 +142,7 @@ async def load_reviewed_constructive(session):
         reports = await r.json()
         for report in reports.values():
             if report['revid'] is None:
-                print(report)
+                logger.warning(report)
             edit = await build_edit_from_revision_id(session, report['revid'])
             if edit:
                 samples.append(Enquiry(edit, "reviewed-constructive", False))
@@ -160,7 +160,7 @@ async def load_reported_pending(session):
         reports = await r.json()
         for report in reports.values():
             if report['revid'] is None:
-                print(report)
+                logger.warning(report)
             edit = await build_edit_from_revision_id(session, report['revid'])
             if edit:
                 samples.append(Enquiry(edit, "reported-pending-review", None))
@@ -177,7 +177,7 @@ async def load_random(session):
         reports = await r.json()
         for report in reports.values():
             if report['new_id'] is None:
-                print(report)
+                logger.warning(report)
             edit = await build_edit_from_revision_id(session, report['new_id'])
             if edit:
                 samples.append(Enquiry(edit, "random-edits", None))

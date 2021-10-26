@@ -36,6 +36,7 @@ from cbng_trainer.common.docker import (build_docker_image,
                                         stop_container,
                                         run_container)
 from cbng_trainer.comparator.comparator import compare_samples
+from cbng_trainer.comparator.results import generate_summary
 from cbng_trainer.trainer.reviewed import dump_reviewed_edits
 
 logger = logging.getLogger(__name__)
@@ -106,8 +107,9 @@ def build_database(input, output, release_tag):
 
 @cli.command()
 @click.option('--target', help='Target binaries path', required=True, type=click.Path(True))
+@click.option('--output', help='Output path', required=False, type=click.Path(True))
 @click.option('--release-tag', help='Git release tag', required=True, default='v1.0.2')
-def compare_database(target, release_tag):
+def compare_database(target, output, release_tag):
     with tempfile.TemporaryDirectory() as tmp_dir:
         base_image = build_docker_image(PosixPath(tmp_dir), release_tag)
     target_image = build_docker_image(PosixPath(target), release_tag, True)
@@ -121,9 +123,15 @@ def compare_database(target, release_tag):
     except Exception as e:
         raise e
     else:
-        click.echo('Dumping results to stdout....')
-        for result in results:
-            print(result)
+        if output:
+            target = PosixPath(output) / 'comparator.md'
+            click.echo(f'Dumping results to {target}')
+            with target.open('w') as fh:
+                fh.write(generate_summary(results))
+        else:
+            click.echo('Dumping results to stdout....')
+            for result in results:
+                print(result)
 
     finally:
         stop_container(base_container)
