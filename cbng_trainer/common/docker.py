@@ -129,7 +129,7 @@ RUN mkdir -p /opt/cbng-core/data
 # Local database
 ADD bayes.db /opt/cbng-core/data/bayes.db
 ADD two_bayes.db /opt/cbng-core/data/two_bayes.db
-ADD main_ann.fann /opt/cbng-core/data/main_ann.db
+ADD main_ann.fann /opt/cbng-core/data/main_ann.fann
 '''
     else:
         docker_file += '''
