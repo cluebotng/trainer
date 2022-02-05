@@ -78,11 +78,7 @@ def run_container(image: str, volumes, arguments):
     for vs, vt in volumes:
         volume_args.extend(['-v', f'{vs}:{vt}'])
 
-    p = subprocess.Popen([
-                             'docker',
-                             'run',
-                             '--rm',
-                         ] + volume_args + [image] + arguments,
+    p = subprocess.Popen(['docker', 'run', '--rm'] + volume_args + [image] + arguments,
                          stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE)
     stdout, stderr = p.communicate()
