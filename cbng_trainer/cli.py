@@ -52,9 +52,12 @@ def cli(debug):
 @cli.command()
 @click.option('--output', help='Target file',
               default='edits.xml', required=True)
-def download_edits(output):
+@click.option('--edit-set', '-es', help='Edit Sets to include',
+              multiple=True, type=int)
+def download_edits(output, edit_set):
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(dump_reviewed_edits(PosixPath(output)))
+    loop.run_until_complete(dump_reviewed_edits(PosixPath(output),
+                                                edit_set or None))
 
 
 @cli.command()

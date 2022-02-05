@@ -32,14 +32,15 @@ from cbng_trainer.common.models import ReviewedEdit, User, Page, Diff
 logger = logging.getLogger(__name__)
 
 
-async def fetch_reviewed_edits(session):
+async def fetch_reviewed_edits(session, include_edit_sets):
     logger.info('Fetching completed edits from review interface')
     async with session.get('https://cluebotng-review.toolforge.org/api/export/done.json') as r:
         data = await r.json()
 
     for edit_group in data['EditGroups']:
-        for edit in edit_group['Done']:
-            yield edit
+        if include_edit_sets is None or edit_group['Key'] in include_edit_sets:
+            for edit in edit_group['Done']:
+                yield edit
 
 
 async def fetch_edit_contents(session, rev_id):
@@ -60,11 +61,11 @@ async def fetch_edit_data(session, rev_id):
         return await r.json()
 
 
-async def load_reviewed_edits():
+async def load_reviewed_edits(include_edit_sets):
     async with aiohttp.ClientSession(
         timeout=aiohttp.ClientTimeout(total=600, connect=60)
     ) as session:
-        async for edit in fetch_reviewed_edits(session):
+        async for edit in fetch_reviewed_edits(session, include_edit_sets):
             is_vandalism = (edit['RealClassification'] == 'V')
             edit_data = await fetch_edit_data(session, edit['Id'])
             if 'error' in edit_data:
@@ -115,11 +116,11 @@ async def load_reviewed_edits():
             )
 
 
-async def dump_reviewed_edits(target_path):
+async def dump_reviewed_edits(target_path, include_edit_sets):
     with target_path.open('w') as fh:
         fh.write('<?xml version="1.0"?>\n')
         fh.write('<WPEditSet>\n')
-        async for edit in load_reviewed_edits():
+        async for edit in load_reviewed_edits(include_edit_sets):
             logger.info(f'Adding edit {edit.id} to dataset')
             fh.write(f'{edit.as_xml()}\n')
         fh.write('</WPEditSet>\n')
