@@ -61,7 +61,9 @@ async def fetch_edit_data(session, rev_id):
 
 
 async def load_reviewed_edits():
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(
+        timeout=aiohttp.ClientTimeout(total=600, connect=60)
+    ) as session:
         async for edit in fetch_reviewed_edits(session):
             is_vandalism = (edit['RealClassification'] == 'V')
             edit_data = await fetch_edit_data(session, edit['Id'])
