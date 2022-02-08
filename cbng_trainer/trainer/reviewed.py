@@ -34,13 +34,13 @@ logger = logging.getLogger(__name__)
 
 async def fetch_reviewed_edits(session, include_edit_sets):
     logger.info('Fetching completed edits from review interface')
-    async with session.get('https://cluebotng-review.toolforge.org/api/export/done.json') as r:
+    async with session.get('https://cluebotng-review.toolforge.org/api/export/trainer.json') as r:
         data = await r.json()
 
-    for edit_group in data['EditGroups']:
-        if include_edit_sets is None or edit_group['Key'] in include_edit_sets:
-            for edit in edit_group['Done']:
-                yield edit
+    for edit_group_id, reviewed_edits in data.items():
+        if include_edit_sets is None or int(edit_group_id) in include_edit_sets:
+            for edit_id, edit_is_vandalism in reviewed_edits.items():
+                yield (int(edit_id), edit_is_vandalism)
 
 
 async def fetch_edit_contents(session, rev_id):
@@ -65,11 +65,10 @@ async def load_reviewed_edits(include_edit_sets):
     async with aiohttp.ClientSession(
         timeout=aiohttp.ClientTimeout(total=600, connect=60)
     ) as session:
-        async for edit in fetch_reviewed_edits(session, include_edit_sets):
-            is_vandalism = (edit['RealClassification'] == 'V')
-            edit_data = await fetch_edit_data(session, edit['Id'])
+        async for edit_id, edit_is_vandalism in fetch_reviewed_edits(session, include_edit_sets):
+            edit_data = await fetch_edit_data(session, edit_id)
             if 'error' in edit_data:
-                logger.error(f'Failed to fetch edit data for {edit["Id"]}: {edit_data}')
+                logger.error(f'Failed to fetch edit data for {edit_id}: {edit_data}')
                 continue
 
             current_edit, previous_edit = await asyncio.gather(
@@ -112,7 +111,7 @@ async def load_reviewed_edits(include_edit_sets):
                     edit_data['previous']['timestamp'],
                     previous_edit,
                 ),
-                is_vandalism,
+                edit_is_vandalism,
             )
 
 
