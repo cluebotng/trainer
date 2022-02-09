@@ -26,6 +26,7 @@ import asyncio
 import logging
 
 import aiohttp
+import aiohttp_retry
 
 from cbng_trainer.common.models import ReviewedEdit, User, Page, Diff
 
@@ -62,8 +63,11 @@ async def fetch_edit_data(session, rev_id):
 
 
 async def load_reviewed_edits(include_edit_sets):
-    async with aiohttp.ClientSession(
-        timeout=aiohttp.ClientTimeout(total=600, connect=60)
+    async with aiohttp_retry.RetryClient(
+        timeout=aiohttp.ClientTimeout(total=600, connect=60),
+        connector=aiohttp.TCPConnector(limit_per_host=20),
+        raise_for_status=False,
+        retry_options=aiohttp_retry.ExponentialRetry(attempts=3),
     ) as session:
         async for edit_id, edit_is_vandalism in fetch_reviewed_edits(session, include_edit_sets):
             edit_data = await fetch_edit_data(session, edit_id)

@@ -26,6 +26,7 @@ import asyncio
 import logging
 
 import aiohttp
+import aiohttp_retry
 
 from cbng_trainer.common.models import Edit, User, Page, Diff, Enquiry
 
@@ -185,7 +186,12 @@ async def load_random(session):
 
 
 async def load_samples():
-    async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(limit_per_host=20)) as session:
+    async with aiohttp_retry.RetryClient(
+        timeout=aiohttp.ClientTimeout(total=600, connect=60),
+        connector=aiohttp.TCPConnector(limit_per_host=20),
+        raise_for_status=False,
+        retry_options=aiohttp_retry.ExponentialRetry(attempts=3),
+    ) as session:
         results = await asyncio.gather(
             load_reviewed_vandalism(session),
             load_reviewed_constructive(session),
