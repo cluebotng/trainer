@@ -77,7 +77,8 @@ async def load_reviewed_edits(include_edit_sets):
                 continue
 
             if 'text' in edit_data['current'] and 'text' in edit_data['previous']:
-                current_edit, previous_edit = edit_data['current']['text'], edit_data['previous']['text']
+                current_edit, previous_edit = (edit_data['current']['text'],
+                                               edit_data['previous']['text'])
             else:
                 current_edit, previous_edit = await asyncio.gather(
                     fetch_edit_contents(session, edit_data['current']['id']),
