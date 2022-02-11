@@ -58,6 +58,7 @@ async def fetch_edit_data(session, rev_id):
     async with session.get('https://cluebotng.toolforge.org/api/', params={
         'action': 'training.data',
         'rev_id': rev_id,
+        'include_text': '1',
     }) as r:
         return await r.json()
 
@@ -75,10 +76,13 @@ async def load_reviewed_edits(include_edit_sets):
                 logger.error(f'Failed to fetch edit data for {edit_id}: {edit_data}')
                 continue
 
-            current_edit, previous_edit = await asyncio.gather(
-                fetch_edit_contents(session, edit_data['current']['id']),
-                fetch_edit_contents(session, edit_data['previous']['id'])
-            )
+            if 'text' in edit_data['current'] and 'text' in edit_data['previous']:
+                current_edit, previous_edit = edit_data['current']['text'], edit_data['previous']['text']
+            else:
+                current_edit, previous_edit = await asyncio.gather(
+                    fetch_edit_contents(session, edit_data['current']['id']),
+                    fetch_edit_contents(session, edit_data['previous']['id'])
+                )
 
             yield ReviewedEdit(
                 edit_data['current']['id'],
