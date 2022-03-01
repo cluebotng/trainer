@@ -55,7 +55,7 @@ async def fetch_edit_contents(session, rev_id):
 
 async def fetch_edit_data(session, rev_id):
     logger.info(f'Fetching extended edit info for {rev_id}')
-    async with session.get('https://cluebotng.toolforge.org/api/', params={
+    async with session.get('https://cluebotng.infrabits.nl/api/', params={
         'action': 'training.data',
         'rev_id': rev_id,
         'include_text': '1',
