@@ -22,8 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
 
-import asyncio
 import logging
+from random import Random
 
 import aiohttp
 import aiohttp_retry
@@ -33,29 +33,26 @@ from cbng_trainer.common.models import ReviewedEdit, User, Page, Diff
 logger = logging.getLogger(__name__)
 
 
-async def fetch_reviewed_edits(session, include_edit_sets):
-    logger.info('Fetching completed edits from review interface')
-    async with session.get('https://cluebotng-review.toolforge.org/api/export/trainer.json') as r:
+async def fetch_edits(session, settings, include_edit_sets, use_random_edits, random_edits_limit):
+    logger.info('Fetching edits from review interface')
+    async with session.get(f'https://{settings.api_hosts.review}/api/export/trainer.json') as r:
         data = await r.json()
 
+    random = Random()
+    included_edits = 0
     for edit_group_id, reviewed_edits in data.items():
         if include_edit_sets is None or int(edit_group_id) in include_edit_sets:
             for edit_id, edit_is_vandalism in reviewed_edits.items():
-                yield (int(edit_id), edit_is_vandalism)
+                if use_random_edits and included_edits > random_edits_limit:
+                    break
+                if not use_random_edits or random.getrandbits(1):
+                    yield (int(edit_id), edit_is_vandalism)
+                included_edits += 1
 
 
-async def fetch_edit_contents(session, rev_id):
-    logger.info(f'Fetching revision contents for {rev_id}')
-    async with session.get('https://en.wikipedia.org/w/index.php', params={
-        'action': 'raw',
-        'diff': rev_id,
-    }) as r:
-        return await r.text()
-
-
-async def fetch_edit_data(session, rev_id):
+async def fetch_edit_data(session, settings, rev_id):
     logger.info(f'Fetching extended edit info for {rev_id}')
-    async with session.get('https://cluebotng.infrabits.nl/api/', params={
+    async with session.get(f'https://{settings.api_hosts.report}/api/', params={
         'action': 'training.data',
         'rev_id': rev_id,
         'include_text': '1',
@@ -63,27 +60,22 @@ async def fetch_edit_data(session, rev_id):
         return await r.json()
 
 
-async def load_reviewed_edits(include_edit_sets):
+async def load_edits(settings, include_edit_sets, use_random_edits, random_edits_limit):
     async with aiohttp_retry.RetryClient(
-        timeout=aiohttp.ClientTimeout(total=600, connect=60),
-        connector=aiohttp.TCPConnector(limit_per_host=20),
-        raise_for_status=False,
-        retry_options=aiohttp_retry.ExponentialRetry(attempts=3),
+            timeout=aiohttp.ClientTimeout(total=600, connect=60),
+            connector=aiohttp.TCPConnector(limit_per_host=20),
+            raise_for_status=False,
+            retry_options=aiohttp_retry.ExponentialRetry(attempts=3),
     ) as session:
-        async for edit_id, edit_is_vandalism in fetch_reviewed_edits(session, include_edit_sets):
-            edit_data = await fetch_edit_data(session, edit_id)
+        async for edit_id, edit_is_vandalism in fetch_edits(session, settings, include_edit_sets,
+                                                            use_random_edits, random_edits_limit):
+            edit_data = await fetch_edit_data(session, settings, edit_id)
             if 'error' in edit_data:
                 logger.error(f'Failed to fetch edit data for {edit_id}: {edit_data}')
                 continue
 
-            if 'text' in edit_data['current'] and 'text' in edit_data['previous']:
-                current_edit, previous_edit = (edit_data['current']['text'],
-                                               edit_data['previous']['text'])
-            else:
-                current_edit, previous_edit = await asyncio.gather(
-                    fetch_edit_contents(session, edit_data['current']['id']),
-                    fetch_edit_contents(session, edit_data['previous']['id'])
-                )
+            current_edit, previous_edit = (edit_data['current']['text'],
+                                           edit_data['previous']['text'])
 
             yield ReviewedEdit(
                 edit_data['current']['id'],
@@ -124,11 +116,18 @@ async def load_reviewed_edits(include_edit_sets):
             )
 
 
-async def dump_reviewed_edits(target_path, include_edit_sets):
+async def dump_edits(settings,
+                     target_path,
+                     include_edit_sets,
+                     use_random_edits,
+                     random_edits_limit):
     with target_path.open('w') as fh:
         fh.write('<?xml version="1.0"?>\n')
         fh.write('<WPEditSet>\n')
-        async for edit in load_reviewed_edits(include_edit_sets):
+        async for edit in load_edits(settings,
+                                     include_edit_sets,
+                                     use_random_edits,
+                                     random_edits_limit):
             logger.info(f'Adding edit {edit.id} to dataset')
             fh.write(f'{edit.as_xml()}\n')
         fh.write('</WPEditSet>\n')

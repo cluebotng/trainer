@@ -21,33 +21,24 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
+FALSE_POSITIVE = '''set terminal png
+set output 'falsepositives.png'
 
-import logging
+set title 'Vandalism Detection Rate by False Positives'
+set xlabel 'False Positive Rate'
+set ylabel 'Portion of Vandalism'
+set xrange [0.0:0.02]
+set grid
 
-from cbng_trainer.common.models import Edit, EnquiryResult
-from cbng_trainer.comparator.core import score_edit_via_core
-from cbng_trainer.comparator.sampler import load_samples
+plot 'thresholdtable.txt' using 3:2 title 'Vandalism Detection Rate' with lines
+'''
 
-logger = logging.getLogger(__name__)
+THREASHOLD = '''set terminal png
+set output 'thresholds.png'
 
+set title 'Detection Rates By Threshold'
+set xlabel 'Score Vandalism Threshold'
+set ylabel 'Detection Rate'
 
-async def compare_edit(edit: Edit, base_port: int, target_port: int):
-    logger.debug(f'Starting comparison using {base_port} vs {target_port} for {edit}')
-    base_result = await score_edit_via_core(edit, base_port)
-    target_result = await score_edit_via_core(edit, target_port)
-
-    return base_result == target_result, base_result, target_result
-
-
-async def compare_samples(base_port: int, target_port: int):
-    results = []
-    async for sample in load_samples():
-        matches, base, target = await compare_edit(sample.edit, base_port, target_port)
-        results.append(EnquiryResult(
-            sample,
-            base,
-            target,
-            matches,
-            (sample.is_vandalism is None or target.think_vandalism == sample.is_vandalism),
-        ))
-    return results
+plot 'thresholdtable.txt' using 1:2 title 'Correct Positive %' with lines, 'thresholdtable.txt' using 1:3 title 'False Positive %' with lines
+'''

@@ -26,119 +26,134 @@ SOFTWARE.
 import asyncio
 import logging
 import sys
-import tempfile
 from pathlib import PosixPath
 
 import click
 
+from cbng_trainer.common.config import Settings, ApiHosts
 from cbng_trainer.common.docker import (build_docker_image,
-                                        start_container,
-                                        stop_container,
                                         run_container)
-from cbng_trainer.comparator.comparator import compare_samples
-from cbng_trainer.comparator.results import generate_summary
-from cbng_trainer.trainer.reviewed import dump_reviewed_edits
+from cbng_trainer.comparator import plots
+from cbng_trainer.trainer.reviewed import dump_edits
 
 logger = logging.getLogger(__name__)
 
 
 @click.group()
+@click.pass_context
 @click.option('--debug', is_flag=True, help='Enable debug logging')
-def cli(debug):
+@click.option('--api-host-report', default="cluebotng.toolforge.org",
+              help='Hostname of the report API')
+@click.option('--api-host-review', default="cluebotng-review.toolforge.org",
+              help='Hostname of the review API')
+@click.option('--api-host-wikipedia', default="en.wikipedia.org",
+              help='Hostname of the wikipedia API')
+def cli(ctx, debug, api_host_report, api_host_review, api_host_wikipedia):
     logging.basicConfig(level=(logging.DEBUG if debug else logging.INFO),
                         stream=sys.stderr)
+    ctx.obj = Settings(ApiHosts(api_host_report, api_host_review, api_host_wikipedia))
 
 
 @cli.command()
+@click.pass_context
 @click.option('--output', help='Target file',
               default='edits.xml', required=True)
 @click.option('--edit-set', '-es', help='Edit Sets to include',
               multiple=True, type=int)
-def download_edits(output, edit_set):
+@click.option('--random-edits', is_flag=True, help='Download random edits')
+@click.option('--random-edits-count', default=200, help='Number of random edits to download')
+def download_edits(ctx, output, edit_set, random_edits, random_edits_count):
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(dump_reviewed_edits(PosixPath(output),
-                                                edit_set or None))
+    loop.run_until_complete(dump_edits(ctx.obj,
+                                       PosixPath(output),
+                                       edit_set or None,
+                                       random_edits,
+                                       random_edits_count))
 
 
 @cli.command()
-@click.option('--input', help='Edits file', required=True,
-              default='edits.xml', type=click.Path(True))
+@click.option('--ann-input', help='Edit set for the ANN training',
+              required=True, default='train-edits.xml', type=click.Path(True))
+@click.option('--bayes-input', help='Edit set for the bayes training',
+              required=True, default='bayes-edits.xml', type=click.Path(True))
 @click.option('--output', help='Target directory',
               required=True, type=click.Path(True))
 @click.option('--release-tag', help='Git release tag',
               required=True, default='v1.0.2')
-def build_database(input, output, release_tag):
+def build_database(ann_input, bayes_input, output, release_tag):
     output = PosixPath(output)
     core_image = build_docker_image(output, release_tag)
     stdout = run_container(core_image,
-                           [(PosixPath(input).absolute().as_posix(),
+                           [(PosixPath(bayes_input).absolute().as_posix(),
                              '/edits.xml'),
-                            (PosixPath(output).absolute().as_posix(),
+                            (output.absolute().as_posix(),
                              '/opt/cbng-core/data/')],
                            ['/opt/cbng-core/cluebotng', '-c', 'conf',
                             '-m', 'bayes_train', '-f', '/edits.xml'])
     logger.info(f'Finished bayes_train: {stdout.decode("utf-8")}')
 
     stdout = run_container(core_image,
-                           [(PosixPath(input).absolute().as_posix(), '/edits.xml'),
-                            (PosixPath(output).absolute().as_posix(), '/opt/cbng-core/data/')],
+                           [(output.absolute().as_posix(), '/opt/cbng-core/data/')],
                            ['/opt/cbng-core/create_bayes_db', 'data/bayes.db',
                             'data/main_bayes_train.dat'])
-    logger.info(f'Finished create_bayes_db bayes.db: {stdout.decode("utf-8")}')
+    logger.info(f'Finished create_bayes_db (bayes): {stdout.decode("utf-8")}')
 
     stdout = run_container(core_image,
-                           [(PosixPath(input).absolute().as_posix(), '/edits.xml'),
-                            (PosixPath(output).absolute().as_posix(), '/opt/cbng-core/data/')],
+                           [(output.absolute().as_posix(), '/opt/cbng-core/data/')],
                            ['/opt/cbng-core/create_bayes_db', 'data/two_bayes.db',
                             'data/two_bayes_train.dat'])
-    logger.info(f'Finished create_bayes_db two_bayes.db: {stdout.decode("utf-8")}')
+    logger.info(f'Finished create_bayes_db (two_bayes): {stdout.decode("utf-8")}')
 
     stdout = run_container(core_image,
-                           [(PosixPath(input).absolute().as_posix(), '/edits.xml'),
-                            (PosixPath(output).absolute().as_posix(), '/opt/cbng-core/data/')],
+                           [(PosixPath(ann_input).absolute().as_posix(), '/edits.xml'),
+                            (output.absolute().as_posix(), '/opt/cbng-core/data/')],
                            ['/opt/cbng-core/cluebotng', '-c', 'conf',
                             '-m', 'ann_train', '-f', '/edits.xml'])
     logger.info(f'Finished ann_train: {stdout.decode("utf-8")}')
 
     stdout = run_container(core_image,
-                           [(PosixPath(input).absolute().as_posix(), '/edits.xml'),
-                            (PosixPath(output).absolute().as_posix(), '/opt/cbng-core/data/')],
+                           [(output.absolute().as_posix(), '/opt/cbng-core/data/')],
                            ['/opt/cbng-core/create_ann', 'data/main_ann.fann',
-                            'data/main_ann_train.dat', '150', '0.25', '162'])
-    logger.info(f'Finished create_ann main_ann.fann: {stdout.decode("utf-8")}')
+                            'data/main_ann_train.dat', '150', '0.037', '100'])
+    logger.info(f'Finished create_ann: {stdout.decode("utf-8")}')
 
 
 @cli.command()
-@click.option('--target', help='Target binaries path', required=True, type=click.Path(True))
+@click.option('--input', help='Edits file', required=True, default='edits.xml', type=click.Path(True))
 @click.option('--output', help='Output path', required=False, type=click.Path(True))
 @click.option('--release-tag', help='Git release tag', required=True, default='v1.0.2')
-def compare_database(target, output, release_tag):
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        base_image = build_docker_image(PosixPath(tmp_dir), release_tag)
-    target_image = build_docker_image(PosixPath(target), release_tag, True)
+def trial_database(input, output, release_tag):
+    output = PosixPath(output)
+    core_image = build_docker_image(output, release_tag)
 
-    base_container = start_container(base_image, 3501)
-    target_container = start_container(target_image, 3502)
+    # Create a folder for all trial data
+    trial_path = (output / 'trialreport')
+    trial_path.mkdir(exist_ok=True)
 
-    try:
-        loop = asyncio.get_event_loop()
-        results = loop.run_until_complete(compare_samples(3501, 3502))
-    except Exception as e:
-        raise e
-    else:
-        if output:
-            target = PosixPath(output) / 'comparator.md'
-            click.echo(f'Dumping results to {target}')
-            with target.open('w') as fh:
-                fh.write(generate_summary(results))
-        else:
-            click.echo('Dumping results to stdout....')
-            for result in results:
-                print(result)
+    # Run the trial edit set
+    stdout = run_container(core_image,
+                           [(PosixPath(input).absolute().as_posix(), '/edits.xml'),
+                            (output.absolute().as_posix(), '/opt/cbng-core/data/'),
+                            (trial_path.absolute().as_posix(), '/opt/cbng-core/trialreport/')],
+                           ['/opt/cbng-core/cluebotng', '-c', 'conf',
+                            '-m', 'trial_run', '-f', '/edits.xml'])
+    logger.info(f'Finished trial_run: {stdout.decode("utf-8")}')
 
-    finally:
-        stop_container(base_container)
-        stop_container(target_container)
+    # Plot the trial results
+    for name, plot in {'threshold': plots.THREASHOLD,
+                 'false_positive_rate': plots.FALSE_POSITIVE}.items():
+
+        # Write the plot file out to process
+        plot_file = trial_path / f'{name}.gnuplot'
+        with plot_file.open('w') as fh:
+            fh.write(plot)
+
+        # Process the plot file
+        stdout = run_container(core_image,
+                               [(trial_path.absolute().as_posix(), '/opt/cbng-core/trialreport/')],
+                               ['gnuplot', f'{name}.gnuplot'],
+                               '/opt/cbng-core/trialreport/')
+        logger.info(f'Finished {name} plot: {stdout.decode("utf-8")}')
 
 
 if __name__ == '__main__':

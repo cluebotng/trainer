@@ -22,22 +22,22 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
 
-import dataclasses
 import logging
+from dataclasses import dataclass
 from typing import Optional
 from xml.etree import ElementTree
 
 logger = logging.getLogger(__name__)
 
 
-@dataclasses.dataclass(frozen=True, repr=True)
+@dataclass(frozen=True, repr=True)
 class Diff:
     minor: bool
     timestamp: int
     text: str
 
 
-@dataclasses.dataclass(frozen=True, repr=True)
+@dataclass(frozen=True, repr=True)
 class User:
     name: str
     edit_count: Optional[int]
@@ -46,7 +46,7 @@ class User:
     registration_time: Optional[int]
 
 
-@dataclasses.dataclass(frozen=True, repr=True)
+@dataclass(frozen=True, repr=True)
 class Page:
     title: str
     namespace: str
@@ -56,7 +56,7 @@ class Page:
     recent_reversion_count: int
 
 
-@dataclasses.dataclass(frozen=True, repr=True)
+@dataclass(frozen=True, repr=True)
 class Edit:
     id: int
     comment: str
@@ -112,29 +112,13 @@ class Edit:
         return ElementTree.tostring(edit).decode()
 
 
-@dataclasses.dataclass(frozen=True, repr=True)
+@dataclass(frozen=True, repr=True)
 class ReviewedEdit(Edit):
     is_vandalism: bool
 
 
-@dataclasses.dataclass(frozen=True, repr=True)
+@dataclass(frozen=True, repr=True)
 class CoreScore:
     id: int
     score: float
     think_vandalism: bool
-
-
-@dataclasses.dataclass(frozen=True, repr=True)
-class Enquiry:
-    edit: Edit
-    dataset: str
-    is_vandalism: Optional[bool]
-
-
-@dataclasses.dataclass(frozen=True, repr=True)
-class EnquiryResult:
-    enquiry: Enquiry
-    base_result: CoreScore
-    target_result: CoreScore
-    results_match: bool
-    expected_match: bool

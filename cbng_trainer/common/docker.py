@@ -71,14 +71,17 @@ def start_container(image: str, port: int):
     return container_name
 
 
-def run_container(image: str, volumes, arguments):
+def run_container(image: str, volumes, arguments, cwd=None):
     logger.info(f'Asking docker to run {image} using {volumes} / {arguments}')
 
-    volume_args = []
+    runtime_args = []
     for vs, vt in volumes:
-        volume_args.extend(['-v', f'{vs}:{vt}'])
+        runtime_args.extend(['-v', f'{vs}:{vt}'])
 
-    p = subprocess.Popen(['docker', 'run', '--rm'] + volume_args + [image] + arguments,
+    if cwd:
+        runtime_args.extend(['-w', cwd])
+
+    p = subprocess.Popen(['docker', 'run', '--rm'] + runtime_args + [image] + arguments,
                          stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE)
     stdout, stderr = p.communicate()
@@ -92,7 +95,7 @@ def build_docker_image(path: PosixPath, git_tag: str, include_local_binaries=Fal
 ARG CORE_TAG
 WORKDIR /opt/cbng-core
 
-RUN apt-get update && apt-get install -y wget && apt-get clean
+RUN apt-get update && apt-get install -y wget gnuplot && apt-get clean
 
 RUN mkdir -p /opt/cbng-core
 RUN wget -O /opt/cbng-core/cluebotng \
