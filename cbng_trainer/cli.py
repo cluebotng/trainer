@@ -119,7 +119,8 @@ def build_database(ann_input, bayes_input, output, release_tag):
 
 
 @cli.command()
-@click.option('--input', help='Edits file', required=True, default='edits.xml', type=click.Path(True))
+@click.option('--input', help='Edits file', required=True, default='edits.xml',
+              type=click.Path(True))
 @click.option('--output', help='Output path', required=False, type=click.Path(True))
 @click.option('--release-tag', help='Git release tag', required=True, default='v1.0.2')
 def trial_database(input, output, release_tag):
@@ -140,8 +141,10 @@ def trial_database(input, output, release_tag):
     logger.info(f'Finished trial_run: {stdout.decode("utf-8")}')
 
     # Plot the trial results
-    for name, plot in {'threshold': plots.THREASHOLD,
-                 'false_positive_rate': plots.FALSE_POSITIVE}.items():
+    for name, plot in {
+        'threshold': plots.THREASHOLD,
+        'false_positive_rate': plots.FALSE_POSITIVE
+    }.items():
 
         # Write the plot file out to process
         plot_file = trial_path / f'{name}.gnuplot'
