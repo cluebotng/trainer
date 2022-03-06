@@ -71,7 +71,7 @@ def start_container(image: str, port: int):
     return container_name
 
 
-def run_container(image: str, volumes, arguments, cwd=None):
+def run_container(image: str, volumes, arguments, cwd=None, abort_on_error=True):
     logger.info(f'Asking docker to run {image} using {volumes} / {arguments}')
 
     runtime_args = []
@@ -86,7 +86,10 @@ def run_container(image: str, volumes, arguments, cwd=None):
                          stderr=subprocess.PIPE)
     stdout, stderr = p.communicate()
     if p.returncode != 0:
-        raise RuntimeError(f'Failed to run container {image}: {stdout} / {stderr}')
+        if abort_on_error:
+            raise RuntimeError(f'Failed to run container {image}: {stdout} / {stderr}')
+        else:
+            logger.error(f'Failed to run container {image}: {stdout} / {stderr}')
     return stdout
 
 

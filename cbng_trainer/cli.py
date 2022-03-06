@@ -152,7 +152,8 @@ def trial_database(input, output, release_tag):
         stdout = run_container(core_image,
                                [(trial_path.absolute().as_posix(), '/opt/cbng-core/trialreport/')],
                                ['gnuplot', f'{name}.gnuplot'],
-                               '/opt/cbng-core/trialreport/')
+                               '/opt/cbng-core/trialreport/',
+                               False)
         logger.info(f'Finished {name} plot: {stdout.decode("utf-8")}')
 
 
