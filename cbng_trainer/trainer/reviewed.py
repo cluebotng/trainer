@@ -21,7 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
-
+import asyncio
 import logging
 from random import Random
 
@@ -50,70 +50,72 @@ async def fetch_edits(session, settings, include_edit_sets, use_random_edits, ra
                 included_edits += 1
 
 
-async def fetch_edit_data(session, settings, rev_id):
-    logger.info(f'Fetching extended edit info for {rev_id}')
+async def build_edit_data(session, settings, edit_id, edit_is_vandalism):
+    logger.info(f'Fetching extended edit info for {edit_id}')
     async with session.get(f'https://{settings.api_hosts.report}/api/', params={
         'action': 'training.data',
-        'rev_id': rev_id,
+        'rev_id': edit_id,
         'include_text': '1',
     }) as r:
-        return await r.json()
+        edit_data = await r.json()
+
+    if 'error' in edit_data:
+        logger.error(f'Failed to get edit data for {edit_id}: {edit_data}')
+        return None
+
+    logger.info(f'Emitting ReviewedEdit for {edit_id}')
+    return ReviewedEdit(
+        edit_data['current']['id'],
+        edit_data['current']['comment'],
+        User(
+            edit_data['current']['user']['name'],
+            edit_data['current']['user']['edit_count'],
+            edit_data['current']['user']['distinct_pages_count'],
+            edit_data['current']['user']['warning_count'],
+            edit_data['current']['user']['registration_time'],
+        ),
+        User(
+            edit_data['previous']['user']['name'],
+            None,
+            None,
+            None,
+            None,
+        ),
+        Page(
+            edit_data['page']['title'],
+            edit_data['page']['namespace'],
+            edit_data['page']['creator'],
+            edit_data['page']['creation_time'],
+            edit_data['page']['recent_edit_count'],
+            edit_data['page']['recent_reversion_count'],
+        ),
+        Diff(
+            edit_data['current']['minor'],
+            edit_data['current']['timestamp'],
+            edit_data['current']['text'],
+        ),
+        Diff(
+            edit_data['previous']['minor'],
+            edit_data['previous']['timestamp'],
+            edit_data['previous']['text'],
+        ),
+        edit_is_vandalism,
+    )
 
 
 async def load_edits(settings, include_edit_sets, use_random_edits, random_edits_limit):
     async with aiohttp_retry.RetryClient(
-            timeout=aiohttp.ClientTimeout(total=600, connect=60),
-            connector=aiohttp.TCPConnector(limit_per_host=20),
+            timeout=aiohttp.ClientTimeout(total=300, sock_read=300, connect=60),
+            connector=aiohttp.TCPConnector(limit_per_host=50),
             raise_for_status=False,
-            retry_options=aiohttp_retry.ExponentialRetry(attempts=3),
+            retry_options=aiohttp_retry.ExponentialRetry(attempts=5),
     ) as session:
-        async for edit_id, edit_is_vandalism in fetch_edits(session, settings, include_edit_sets,
-                                                            use_random_edits, random_edits_limit):
-            edit_data = await fetch_edit_data(session, settings, edit_id)
-            if 'error' in edit_data:
-                logger.error(f'Failed to fetch edit data for {edit_id}: {edit_data}')
-                continue
-
-            current_edit, previous_edit = (edit_data['current']['text'],
-                                           edit_data['previous']['text'])
-
-            yield ReviewedEdit(
-                edit_data['current']['id'],
-                edit_data['current']['comment'],
-                User(
-                    edit_data['current']['user']['name'],
-                    edit_data['current']['user']['edit_count'],
-                    edit_data['current']['user']['distinct_pages_count'],
-                    edit_data['current']['user']['warning_count'],
-                    edit_data['current']['user']['registration_time'],
-                ),
-                User(
-                    edit_data['previous']['user']['name'],
-                    None,
-                    None,
-                    None,
-                    None,
-                ),
-                Page(
-                    edit_data['page']['title'],
-                    edit_data['page']['namespace'],
-                    edit_data['page']['creator'],
-                    edit_data['page']['creation_time'],
-                    edit_data['page']['recent_edit_count'],
-                    edit_data['page']['recent_reversion_count'],
-                ),
-                Diff(
-                    edit_data['current']['minor'],
-                    edit_data['current']['timestamp'],
-                    current_edit,
-                ),
-                Diff(
-                    edit_data['previous']['minor'],
-                    edit_data['previous']['timestamp'],
-                    previous_edit,
-                ),
-                edit_is_vandalism,
-            )
+        edits = await asyncio.gather(*[
+            build_edit_data(session, settings, edit_id, edit_is_vandalism)
+            async for edit_id, edit_is_vandalism in fetch_edits(session, settings, include_edit_sets,
+                                                                use_random_edits, random_edits_limit)
+        ])
+        return [edit for edit in edits if edit is not None]
 
 
 async def dump_edits(settings,
@@ -121,13 +123,14 @@ async def dump_edits(settings,
                      include_edit_sets,
                      use_random_edits,
                      random_edits_limit):
+    edits = await load_edits(settings,
+                             include_edit_sets,
+                             use_random_edits,
+                             random_edits_limit)
     with target_path.open('w') as fh:
         fh.write('<?xml version="1.0"?>\n')
         fh.write('<WPEditSet>\n')
-        async for edit in load_edits(settings,
-                                     include_edit_sets,
-                                     use_random_edits,
-                                     random_edits_limit):
+        for edit in edits:
             logger.info(f'Adding edit {edit.id} to dataset')
             fh.write(f'{edit.as_xml()}\n')
         fh.write('</WPEditSet>\n')
