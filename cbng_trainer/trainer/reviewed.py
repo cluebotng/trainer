@@ -112,8 +112,10 @@ async def load_edits(settings, include_edit_sets, use_random_edits, random_edits
     ) as session:
         edits = await asyncio.gather(*[
             build_edit_data(session, settings, edit_id, edit_is_vandalism)
-            async for edit_id, edit_is_vandalism in fetch_edits(session, settings, include_edit_sets,
-                                                                use_random_edits, random_edits_limit)
+            async for edit_id, edit_is_vandalism in fetch_edits(session, settings,
+                                                                include_edit_sets,
+                                                                use_random_edits,
+                                                                random_edits_limit)
         ])
         return [edit for edit in edits if edit is not None]
 
