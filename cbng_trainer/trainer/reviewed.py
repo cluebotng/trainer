@@ -22,6 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
 import asyncio
+import json
 import logging
 from random import Random
 
@@ -36,7 +37,9 @@ logger = logging.getLogger(__name__)
 async def fetch_edits(session, settings, include_edit_sets, use_random_edits, random_edits_limit):
     logger.info('Fetching edits from review interface')
     async with session.get(f'https://{settings.api_hosts.review}/api/export/trainer.json') as r:
-        data = await r.json()
+        data = await r.text()
+        logger.info(f'Got data: {data}')
+        data = json.loads(data)
 
     random = Random()
     included_edits = 0
@@ -57,7 +60,9 @@ async def build_edit_data(session, settings, edit_id, edit_is_vandalism):
         'rev_id': edit_id,
         'include_text': '1',
     }) as r:
-        edit_data = await r.json()
+        edit_data = await r.text()
+        logger.info(f'Got data: {edit_data}')
+        edit_data = json.loads(edit_data)
 
     if 'error' in edit_data:
         logger.error(f'Failed to get edit data for {edit_id}: {edit_data}')
