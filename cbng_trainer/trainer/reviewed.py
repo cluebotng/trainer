@@ -105,7 +105,7 @@ async def build_edit_data(session, settings, edit_id, edit_is_vandalism):
 
 async def load_edits(settings, include_edit_sets, use_random_edits, random_edits_limit):
     async with aiohttp_retry.RetryClient(
-        timeout=aiohttp.ClientTimeout(total=300, sock_read=300, connect=300),
+        timeout=aiohttp.ClientTimeout(total=300),
         connector=aiohttp.TCPConnector(limit_per_host=settings.max_host_connections),
         raise_for_status=False,
         retry_options=aiohttp_retry.ExponentialRetry(attempts=5),
