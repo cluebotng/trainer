@@ -42,16 +42,18 @@ logger = logging.getLogger(__name__)
 @click.group()
 @click.pass_context
 @click.option('--debug', is_flag=True, help='Enable debug logging')
-@click.option('--api-host-report', default="cluebotng.toolforge.org",
+@click.option('--api-host-report', default="cluebotng-api.toolforge.org",
               help='Hostname of the report API')
 @click.option('--api-host-review', default="cluebotng-review.toolforge.org",
               help='Hostname of the review API')
 @click.option('--api-host-wikipedia', default="en.wikipedia.org",
               help='Hostname of the wikipedia API')
-def cli(ctx, debug, api_host_report, api_host_review, api_host_wikipedia):
+@click.option('--max-connections', default=5, help='Max connections to use per host')
+def cli(ctx, debug, api_host_report, api_host_review, api_host_wikipedia, max_connections):
     logging.basicConfig(level=(logging.DEBUG if debug else logging.INFO),
                         stream=sys.stderr)
-    ctx.obj = Settings(ApiHosts(api_host_report, api_host_review, api_host_wikipedia))
+    ctx.obj = Settings(max_connections,
+                       ApiHosts(api_host_report, api_host_review, api_host_wikipedia))
 
 
 @cli.command()

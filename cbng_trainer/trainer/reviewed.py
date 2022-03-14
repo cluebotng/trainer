@@ -22,7 +22,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
 import asyncio
-import json
 import logging
 from random import Random
 
@@ -37,9 +36,7 @@ logger = logging.getLogger(__name__)
 async def fetch_edits(session, settings, include_edit_sets, use_random_edits, random_edits_limit):
     logger.info('Fetching edits from review interface')
     async with session.get(f'https://{settings.api_hosts.review}/api/export/trainer.json') as r:
-        data = await r.text()
-        logger.info(f'Got data: {data}')
-        data = json.loads(data)
+        data = await r.json()
 
     random = Random()
     included_edits = 0
@@ -55,14 +52,12 @@ async def fetch_edits(session, settings, include_edit_sets, use_random_edits, ra
 
 async def build_edit_data(session, settings, edit_id, edit_is_vandalism):
     logger.info(f'Fetching extended edit info for {edit_id}')
-    async with session.get(f'https://{settings.api_hosts.report}/api/', params={
+    async with session.get(f'https://{settings.api_hosts.api}', params={
         'action': 'training.data',
         'rev_id': edit_id,
         'include_text': '1',
     }) as r:
-        edit_data = await r.text()
-        logger.info(f'Got data: {edit_data}')
-        edit_data = json.loads(edit_data)
+        edit_data = await r.json()
 
     if 'error' in edit_data:
         logger.error(f'Failed to get edit data for {edit_id}: {edit_data}')
@@ -110,10 +105,10 @@ async def build_edit_data(session, settings, edit_id, edit_is_vandalism):
 
 async def load_edits(settings, include_edit_sets, use_random_edits, random_edits_limit):
     async with aiohttp_retry.RetryClient(
-            timeout=aiohttp.ClientTimeout(total=300, sock_read=300, connect=60),
-            connector=aiohttp.TCPConnector(limit_per_host=50),
-            raise_for_status=False,
-            retry_options=aiohttp_retry.ExponentialRetry(attempts=5),
+        timeout=aiohttp.ClientTimeout(total=300, sock_read=300, connect=60),
+        connector=aiohttp.TCPConnector(limit_per_host=settings.max_host_connections),
+        raise_for_status=False,
+        retry_options=aiohttp_retry.ExponentialRetry(attempts=5),
     ) as session:
         edits = await asyncio.gather(*[
             build_edit_data(session, settings, edit_id, edit_is_vandalism)

@@ -26,11 +26,12 @@ from dataclasses import dataclass
 
 @dataclass(repr=True, frozen=True)
 class ApiHosts:
-    report: str
+    api: str
     review: str
     wikipedia: str
 
 
 @dataclass(repr=True, frozen=True)
 class Settings:
+    max_host_connections: int
     api_hosts: ApiHosts
