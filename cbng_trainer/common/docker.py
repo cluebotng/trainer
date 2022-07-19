@@ -26,11 +26,12 @@ import logging
 import subprocess
 import uuid
 from pathlib import PosixPath
+from typing import List, Tuple, Optional
 
 logger = logging.getLogger(__name__)
 
 
-def stop_container(name: str):
+def stop_container(name: str) -> bool:
     logger.info(f'Asking docker to kill {name}')
     p = subprocess.Popen([
         'docker',
@@ -41,11 +42,11 @@ def stop_container(name: str):
         stderr=subprocess.PIPE)
     stdout, stderr = p.communicate()
     if p.returncode != 0:
-        raise RuntimeError(f'Failed to stop container {name}: {stdout} / {stderr}')
+        raise RuntimeError(f'Failed to stop container {name}: {stdout!r} / {stderr!r}')
     return True
 
 
-def start_container(image: str, port: int):
+def start_container(image: str, port: int) -> str:
     container_name = f'cbng-core-{uuid.uuid4()}'
     logger.info(f'Asking docker to start {container_name} from {image} using {port}')
     p = subprocess.Popen([
@@ -67,11 +68,15 @@ def start_container(image: str, port: int):
         stderr=subprocess.PIPE)
     stdout, stderr = p.communicate()
     if p.returncode != 0:
-        raise RuntimeError(f'Failed to start container {image}: {stdout} / {stderr}')
+        raise RuntimeError(f'Failed to start container {image}: {stdout!r} / {stderr!r}')
     return container_name
 
 
-def run_container(image: str, volumes, arguments, cwd=None, abort_on_error=True):
+def run_container(image: str,
+                  volumes: List[Tuple[str, str]],
+                  arguments: List[str],
+                  cwd: Optional[str] = None,
+                  abort_on_error: bool = True) -> bytes:
     logger.info(f'Asking docker to run {image} using {volumes} / {arguments}')
 
     runtime_args = []
@@ -87,13 +92,13 @@ def run_container(image: str, volumes, arguments, cwd=None, abort_on_error=True)
     stdout, stderr = p.communicate()
     if p.returncode != 0:
         if abort_on_error:
-            raise RuntimeError(f'Failed to run container {image}: {stdout} / {stderr}')
+            raise RuntimeError(f'Failed to run container {image}: {stdout!r} / {stderr!r}')
         else:
-            logger.error(f'Failed to run container {image}: {stdout} / {stderr}')
+            logger.error(f'Failed to run container {image}: {stdout!r} / {stderr!r}')
     return stdout
 
 
-def build_docker_image(path: PosixPath, git_tag: str, include_local_binaries=False):
+def build_docker_image(path: PosixPath, git_tag: str, include_local_binaries: bool = False) -> str:
     docker_file = '''FROM debian:9
 ARG CORE_TAG
 WORKDIR /opt/cbng-core
@@ -165,7 +170,7 @@ RUN wget -O /opt/cbng-core/data/main_ann.fann \
         cwd=path.as_posix())
     stdout, stderr = p.communicate()
     if p.returncode != 0:
-        raise RuntimeError(f'Failed to build docker image: {stdout} / {stderr}')
+        raise RuntimeError(f'Failed to build docker image: {stdout!r} / {stderr!r}')
 
     (path / 'Dockerfile').unlink(True)
     return image_tag

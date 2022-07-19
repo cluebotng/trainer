@@ -24,6 +24,7 @@ SOFTWARE.
 
 import logging
 import socket
+from typing import Optional
 from xml.etree import ElementTree
 
 from cbng_trainer.common.models import Edit, CoreScore
@@ -31,7 +32,7 @@ from cbng_trainer.common.models import Edit, CoreScore
 logger = logging.getLogger(__name__)
 
 
-async def score_edit_via_core(edit: Edit, port: int):
+async def score_edit_via_core(edit: Edit, port: int) -> Optional[CoreScore]:
     xml = edit.as_xml()
     logger.debug(f'Sending to {port}: {xml}')
 
@@ -47,10 +48,20 @@ async def score_edit_via_core(edit: Edit, port: int):
             response += data
 
     et = ElementTree.fromstring(response)
+
+    edit_id = et.find('./WPEdit/editid')
+    score = et.find('./WPEdit/score')
+    think_vandalism = et.find('./WPEdit/think_vandalism')
+
+    if not (edit_id and edit_id.text
+            and score and score.text
+            and think_vandalism and think_vandalism.text):
+        return None
+
     cs = CoreScore(
-        int(et.find('./WPEdit/editid').text),
-        float(et.find('./WPEdit/score').text),
-        et.find('./WPEdit/think_vandalism').text == 'true',
+        int(edit_id.text),
+        float(score.text),
+        think_vandalism.text == 'true',
     )
     logger.info(f'[{edit.id}] returning from {port}: {cs}')
     return cs

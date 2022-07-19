@@ -66,7 +66,7 @@ class Edit:
     current_diff: Diff
     previous_diff: Diff
 
-    def as_xml(self):
+    def as_xml(self) -> str:
         edit = ElementTree.Element('WPEdit')
 
         ElementTree.SubElement(edit, 'EditType').text = 'change'

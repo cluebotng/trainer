@@ -27,6 +27,7 @@ import asyncio
 import logging
 import sys
 from pathlib import PosixPath
+from typing import List
 
 import click
 
@@ -49,7 +50,12 @@ logger = logging.getLogger(__name__)
 @click.option('--api-host-wikipedia', default="en.wikipedia.org",
               help='Hostname of the wikipedia API')
 @click.option('--max-connections', default=5, help='Max connections to use per host')
-def cli(ctx, debug, api_host_report, api_host_review, api_host_wikipedia, max_connections):
+def cli(ctx: click.Context,
+        debug: bool,
+        api_host_report: str,
+        api_host_review: str,
+        api_host_wikipedia: str,
+        max_connections: int) -> None:
     logging.basicConfig(level=(logging.DEBUG if debug else logging.INFO),
                         stream=sys.stderr)
     ctx.obj = Settings(max_connections,
@@ -64,7 +70,11 @@ def cli(ctx, debug, api_host_report, api_host_review, api_host_wikipedia, max_co
               multiple=True, type=int)
 @click.option('--random-edits', is_flag=True, help='Download random edits')
 @click.option('--random-edits-count', default=200, help='Number of random edits to download')
-def download_edits(ctx, output, edit_set, random_edits, random_edits_count):
+def download_edits(ctx: click.Context,
+                   output: str,
+                   edit_set: List[int],
+                   random_edits: bool,
+                   random_edits_count: int) -> None:
     loop = asyncio.get_event_loop()
     loop.run_until_complete(dump_edits(ctx.obj,
                                        PosixPath(output),
@@ -82,7 +92,10 @@ def download_edits(ctx, output, edit_set, random_edits, random_edits_count):
               required=True, type=click.Path(True))
 @click.option('--release-tag', help='Git release tag',
               required=True, default='v1.0.2')
-def build_database(ann_input, bayes_input, output, release_tag):
+def build_database(ann_input: PosixPath,
+                   bayes_input: PosixPath,
+                   output: PosixPath,
+                   release_tag: str) -> None:
     output = PosixPath(output)
     core_image = build_docker_image(output, release_tag)
     stdout = run_container(core_image,
@@ -125,7 +138,9 @@ def build_database(ann_input, bayes_input, output, release_tag):
               type=click.Path(True))
 @click.option('--output', help='Output path', required=False, type=click.Path(True))
 @click.option('--release-tag', help='Git release tag', required=True, default='v1.0.2')
-def trial_database(input, output, release_tag):
+def trial_database(input: PosixPath,
+                   output: PosixPath,
+                   release_tag: str) -> None:
     output = PosixPath(output)
     core_image = build_docker_image(output, release_tag)
 
@@ -147,7 +162,6 @@ def trial_database(input, output, release_tag):
         'threshold': plots.THREASHOLD,
         'false_positive_rate': plots.FALSE_POSITIVE
     }.items():
-
         # Write the plot file out to process
         plot_file = trial_path / f'{name}.gnuplot'
         with plot_file.open('w') as fh:

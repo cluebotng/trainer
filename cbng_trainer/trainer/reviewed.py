@@ -23,19 +23,28 @@ SOFTWARE.
 '''
 import asyncio
 import logging
+from pathlib import PosixPath
 from random import Random
+from typing import Optional, List, AsyncIterator, Tuple
 
 import aiohttp
 import aiohttp_retry
 
+from cbng_trainer.common.config import Settings
 from cbng_trainer.common.models import ReviewedEdit, User, Page, Diff
 
 logger = logging.getLogger(__name__)
+HTTP_HEADERS = {'User-Agent': 'ClueBot NG Trainer/1.0'}
 
 
-async def fetch_edits(session, settings, include_edit_sets, use_random_edits, random_edits_limit):
+async def fetch_edits(session: aiohttp_retry.RetryClient,
+                      settings: Settings,
+                      include_edit_sets: Optional[List[int]],
+                      use_random_edits: bool,
+                      random_edits_limit: int) -> AsyncIterator[Tuple[int, bool]]:
     logger.info('Fetching edits from review interface')
-    async with session.get(f'https://{settings.api_hosts.review}/api/export/trainer.json') as r:
+    async with session.get(f'https://{settings.api_hosts.review}/api/export/trainer.json',
+                           headers=HTTP_HEADERS) as r:
         data = await r.json()
 
     random = Random()
@@ -50,13 +59,16 @@ async def fetch_edits(session, settings, include_edit_sets, use_random_edits, ra
                 included_edits += 1
 
 
-async def build_edit_data(session, settings, edit_id, edit_is_vandalism):
+async def build_edit_data(session: aiohttp_retry.RetryClient,
+                          settings: Settings,
+                          edit_id: int,
+                          edit_is_vandalism: bool) -> Optional[ReviewedEdit]:
     logger.info(f'Fetching extended edit info for {edit_id}')
     async with session.get(f'https://{settings.api_hosts.api}', params={
         'action': 'training.data',
         'rev_id': edit_id,
         'include_text': '1',
-    }) as r:
+    }, headers=HTTP_HEADERS) as r:
         edit_data = await r.json()
 
     if 'error' in edit_data:
@@ -103,12 +115,15 @@ async def build_edit_data(session, settings, edit_id, edit_is_vandalism):
     )
 
 
-async def load_edits(settings, include_edit_sets, use_random_edits, random_edits_limit):
+async def load_edits(settings: Settings,
+                     include_edit_sets: Optional[List[int]],
+                     use_random_edits: bool,
+                     random_edits_limit: int) -> List[ReviewedEdit]:
     async with aiohttp_retry.RetryClient(
-        timeout=aiohttp.ClientTimeout(total=21600),
-        connector=aiohttp.TCPConnector(limit_per_host=settings.max_host_connections),
-        raise_for_status=False,
-        retry_options=aiohttp_retry.ExponentialRetry(attempts=5),
+            timeout=aiohttp.ClientTimeout(total=21600),
+            connector=aiohttp.TCPConnector(limit_per_host=settings.max_host_connections),
+            raise_for_status=False,
+            retry_options=aiohttp_retry.ExponentialRetry(attempts=5),
     ) as session:
         edits = await asyncio.gather(*[
             build_edit_data(session, settings, edit_id, edit_is_vandalism)
@@ -120,11 +135,11 @@ async def load_edits(settings, include_edit_sets, use_random_edits, random_edits
         return [edit for edit in edits if edit is not None]
 
 
-async def dump_edits(settings,
-                     target_path,
-                     include_edit_sets,
-                     use_random_edits,
-                     random_edits_limit):
+async def dump_edits(settings: Settings,
+                     target_path: PosixPath,
+                     include_edit_sets: Optional[List[int]],
+                     use_random_edits: bool,
+                     random_edits_limit: int) -> None:
     edits = await load_edits(settings,
                              include_edit_sets,
                              use_random_edits,
