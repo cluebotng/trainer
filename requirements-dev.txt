@@ -4,4 +4,4 @@ pylama==8.3.8
 pyflakes==2.4.0 # pipup:version:<2.5.0
 mypy==0.971
 types-PyYAML==6.0.11
-types-setuptools==63.2.3
+types-setuptools==63.4.0
