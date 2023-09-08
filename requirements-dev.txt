@@ -1,5 +1,5 @@
-tox==4.11.1
-pytest==7.4.1
+tox==4.11.2
+pytest==7.4.2
 pylama==8.4.1
 mypy==1.5.1
 types-PyYAML==6.0.12.11
