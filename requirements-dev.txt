@@ -1,6 +1,6 @@
 tox==4.11.3
 pytest==7.4.2
 pylama==8.4.1
-mypy==1.5.1
+mypy==1.6.0
 types-PyYAML==6.0.12.12
 types-setuptools==68.2.0.0
