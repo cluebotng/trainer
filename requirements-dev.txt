@@ -3,4 +3,4 @@ pytest==8.3.5
 pylama==8.4.1
 mypy==1.15.0
 types-PyYAML==6.0.12.20250326
-types-setuptools==77.0.2.20250328
+types-setuptools==78.1.0.20250329
