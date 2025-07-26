@@ -1,25 +1,37 @@
 name: CI
-on: [ push, pull_request ]
+on: { pull_request: { }, push: { } }
+concurrency:
+  group: ${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
 jobs:
-  pylama:
+  tox:
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [ "ruff", "black" ]
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.13
+          cache: 'pip'
+      - name: Install Poetry
+        run: curl -sSL https://install.python-poetry.org | python -
+      - name: Install python dependencies
+        run: poetry install --with test
+      - name: Run tox target
+        run: poetry run tox --current-env -e ${{ matrix.target }}
+
+  container:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python 3.x
-        uses: actions/setup-python@v2
-        with: { python-version: '3.9' }
-      - name: Install dependencies
-        run: pip install tox
-      - name: Run pylama
-        run: tox -e pylama
-  mypy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python 3.x
-        uses: actions/setup-python@v2
-        with: { python-version: '3.9' }
-      - name: Install dependencies
-        run: pip install tox
-      - name: Run mypy
-        run: tox -e mypy
+      - name: Build container
+        run: |
+          docker run \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v $PWD:/workspace -w /workspace \
+            buildpacksio/pack build reviewer --builder heroku/builder:24

@@ -2,7 +2,7 @@
 '''
 MIT License
 
-Copyright (c) 2021 Damian Zaremba
+Copyright (c) 2025 Damian Zaremba
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -24,14 +24,10 @@ SOFTWARE.
 '''
 from pathlib import Path
 
-import pkg_resources
 from setuptools import setup, find_packages
 
 with Path('README.md').open('r') as fh:
     long_description = fh.read()
-
-with Path('requirements.txt').open('r') as fh:
-    install_requires = [str(req) for req in pkg_resources.parse_requirements(fh)]
 
 setup(
     name='cbng-trainer',
@@ -42,7 +38,14 @@ setup(
     packages=find_packages(),
     license='MIT',
     platforms='any',
-    install_requires=install_requires,
+    install_requires=[
+        "click",
+        "kubernetes",
+        "requests",
+        "aiohttp",
+        "aiohttp-retry",
+        "toolforge_weld",
+    ],
     entry_points={
         'console_scripts': [
             'cbng-trainer=cbng_trainer.cli:cli'

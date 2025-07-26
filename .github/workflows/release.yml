@@ -1,0 +1,15 @@
+name: Release
+on: { push: { branch: [ 'main' ] } }
+permissions:
+  deployments: write
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger deployment job
+        run: |
+          curl \
+          --fail-with-body \
+          -X POST \
+          'https://api.svc.toolforge.org/components/v1/tool/cluebotng-trainer/deployment?token=${{ secrets.TOOLFORGE_DEPLOY_TOKEN }}'

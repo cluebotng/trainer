@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-'''
+"""
 MIT License
 
-Copyright (c) 2021 Damian Zaremba
+Copyright (c) 2025 Damian Zaremba
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -21,160 +21,260 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-'''
-
-import asyncio
+"""
+import hashlib
 import logging
 import sys
+import time
+from datetime import datetime, timezone
 from pathlib import PosixPath
-from typing import List
+from typing import Optional, List
 
 import click
 
-from cbng_trainer.common.config import Settings, ApiHosts
-from cbng_trainer.common.docker import (build_docker_image,
-                                        run_container)
-from cbng_trainer.comparator import plots
-from cbng_trainer.trainer.reviewed import dump_edits
+from cbng_trainer.api import FileApi
+from cbng_trainer.common import steps
+from cbng_trainer.common.files import calculate_target_path
+from cbng_trainer.common.steps import (
+    store_edit_sets,
+    run_bayes_train,
+    create_main_bayes_db,
+    create_two_bayes_db,
+    run_ann_train,
+    run_create_ann,
+    create_plots,
+)
+from cbng_trainer.common.toolforge import launch_job, job_has_completed
+from cbng_trainer.common.utils import (
+    get_target_edit_groups,
+    get_latest_github_release,
+)
 
 logger = logging.getLogger(__name__)
 
 
 @click.group()
-@click.pass_context
-@click.option('--debug', is_flag=True, help='Enable debug logging')
-@click.option('--api-host-report', default="cluebotng-api.toolforge.org",
-              help='Hostname of the report API')
-@click.option('--api-host-review', default="cluebotng-review.toolforge.org",
-              help='Hostname of the review API')
-@click.option('--api-host-wikipedia', default="en.wikipedia.org",
-              help='Hostname of the wikipedia API')
-@click.option('--max-connections', default=5, help='Max connections to use per host')
-def cli(ctx: click.Context,
-        debug: bool,
-        api_host_report: str,
-        api_host_review: str,
-        api_host_wikipedia: str,
-        max_connections: int) -> None:
-    logging.basicConfig(level=(logging.DEBUG if debug else logging.INFO),
-                        stream=sys.stderr)
-    ctx.obj = Settings(max_connections,
-                       ApiHosts(api_host_report, api_host_review, api_host_wikipedia))
+def cli() -> None:
+    logging.basicConfig(level=logging.INFO, stream=sys.stderr)
+
+
+# "Job runner" - spawns kubernetes pods to run through our steps
+@cli.command()
+# Run specific
+@click.option("--target-name", required=True)
+@click.option("--instance-name", required=True)
+@click.option("--download-training", required=True)
+@click.option("--download-trial", required=False)
+# Internal
+@click.option("--kubernetes-namespace", required=True)
+@click.option("--container-image", default="tool-cluebotng-trainer/backend-service:latest", required=True)
+@click.option("--release-ref", required=True)
+@click.option("--trainer-host", required=True)
+def run_edit_set(
+    target_name: str,
+    instance_name: str,
+    kubernetes_namespace: str,
+    container_image: str,
+    release_ref: str,
+    trainer_host: str,
+    download_training: str,
+    download_trial: Optional[str],
+) -> None:
+    job_id = hashlib.sha256(target_name.encode("utf-8")).hexdigest()[0:30]
+
+    # Download the files
+    files_to_download = {
+        download_training: calculate_target_path(trainer_host, target_name, instance_name, "edit-sets", "train.xml")
+    }
+    if download_trial:
+        files_to_download |= {
+            download_trial: calculate_target_path(trainer_host, target_name, instance_name, "edit-sets", "trial.xml")
+        }
+
+    logger.info("Downloading files")
+    if not store_edit_sets(
+        container_namespace=kubernetes_namespace,
+        container_name=f"{job_id}-download",
+        mapping=files_to_download,
+    ):
+        return
+
+    # Build
+    logger.info("Running bayes train")
+    if not run_bayes_train(
+        download_edit_set_url=files_to_download[download_training],
+        upload_files_url=calculate_target_path(trainer_host, target_name, instance_name, "artifacts"),
+        container_namespace=kubernetes_namespace,
+        container_name=f"{job_id}-bayes-train",
+        release_ref=release_ref,
+    ):
+        return
+
+    logger.info("Creating main bayes database")
+    if not create_main_bayes_db(
+        download_edit_set_url=files_to_download[download_training],
+        upload_files_url=calculate_target_path(trainer_host, target_name, instance_name, "artifacts"),
+        container_namespace=kubernetes_namespace,
+        container_name=f"{job_id}-main-bayes-db",
+        release_ref=release_ref,
+    ):
+        return
+
+    logger.info("Creating two bayes database")
+    if not create_two_bayes_db(
+        download_edit_set_url=files_to_download[download_training],
+        upload_files_url=calculate_target_path(trainer_host, target_name, instance_name, "artifacts"),
+        container_namespace=kubernetes_namespace,
+        container_name=f"{job_id}-two-bayes-db",
+        release_ref=release_ref,
+    ):
+        return
+
+    logger.info("Running ann train")
+    if not run_ann_train(
+        download_edit_set_url=files_to_download[download_training],
+        upload_files_url=calculate_target_path(trainer_host, target_name, instance_name, "artifacts"),
+        container_namespace=kubernetes_namespace,
+        container_name=f"{job_id}-ann-train",
+        release_ref=release_ref,
+    ):
+        return
+
+    logger.info("Running ann create")
+    if not run_create_ann(
+        download_edit_set_url=files_to_download[download_training],
+        upload_files_url=calculate_target_path(trainer_host, target_name, instance_name, "artifacts"),
+        container_namespace=kubernetes_namespace,
+        container_name=f"{job_id}-ann-create",
+        release_ref=release_ref,
+    ):
+        return
+
+    # Run trial
+    if download_trial:
+        logger.info("Executing trial")
+        steps.run_trial_report(
+            download_edit_set_url=files_to_download[download_trial],
+            download_bins_url=calculate_target_path(trainer_host, target_name, instance_name, "artifacts"),
+            upload_report_url=calculate_target_path(trainer_host, target_name, instance_name, "trial"),
+            container_namespace=kubernetes_namespace,
+            container_name=f"{job_id}-trial",
+            release_ref=release_ref,
+        )
+
+        logger.info("Creating plots via API")
+        create_plots(
+            container_namespace=kubernetes_namespace,
+            container_name=f"{job_id}-create-plots",
+            image_tag=container_image,
+            upload_report_url=calculate_target_path(trainer_host, target_name, instance_name, "trial"),
+        )
+
+
+# "Job coordinator" - figures out which groups we need to perform a run for and creates a job for each
+@cli.command()
+@click.option("--edit-set", multiple=True, default=None)
+@click.option("--print-only/--no-print-only", default=False)
+# These are essentially constants
+@click.option("--toolforge-user", default="cluebotng-trainer", required=True)
+@click.option("--kubernetes-namespace", default="tool-cluebotng-trainer", required=True)
+@click.option(
+    "--container-image", default="tools-harbor.wmcloud.org/tool-cluebotng-trainer/backend-service:latest", required=True
+)
+@click.option(
+    "--review-host", default="http://cluebotng-review.tool-cluebotng-review.svc.tools.local:8000", required=True
+)
+@click.option(
+    "--trainer-host", default="http://cluebotng-trainer.tool-cluebotng-trainer.svc.tools.local:8000", required=True
+)
+@click.option("--release-ref", required=False)
+def run_edit_sets(
+    edit_set: List[str],
+    print_only: bool,
+    toolforge_user: str,
+    kubernetes_namespace: str,
+    container_image: str,
+    review_host: str,
+    trainer_host: str,
+    release_ref: Optional[str],
+) -> None:
+    if not release_ref:
+        release_ref = get_latest_github_release("cluebotng", "core")
+    target_groups = get_target_edit_groups(review_host, edit_set)
+
+    run_instance = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+    targets = []
+    for target_name, groups in target_groups.items():
+        if ("Training" in groups or "Reported False Positives" in groups) and "Trial" not in groups:
+            if sampled_group_id := target_groups.get("Sampled Main Namespace Edits", {}).get("Generic"):
+                logger.info(f"Using sampled edits as fallback trial group for {target_name}")
+                groups["Trial"] = sampled_group_id
+
+        for group_name, group_id in groups.items():
+            # We will use the training set, no need to download the redundant file
+            if group_name == "Generic" and "Training" in groups:
+                logger.warning(f"Ignoring generic group in place of training for {target_name}")
+                continue
+
+            if group_name == "Generic" and "Reported False Positives" in groups:
+                logger.warning(f"Ignoring generic group in place of reported false positives for {target_name}")
+                continue
+
+            if group_name == "Trial":
+                logger.debug("Ignoring trial group")
+                continue
+
+            script = [
+                "cbng-trainer",
+                "run-edit-set",
+                f'--kubernetes-namespace="{kubernetes_namespace}"',
+                f'--target-name="{target_name}"',
+                f'--container-image="{container_image}"',
+                f'--instance-name="{run_instance}"',
+                f'--release-ref="{release_ref}"',
+                f'--trainer-host="{trainer_host}"',
+            ]
+            if group_name in {"Generic", "Reported False Positives", "Training"}:
+                script.append(f'--download-training="{review_host}/api/v1/edit-groups/{group_id}/dump-editset/"')
+            if "Trial" in groups:
+                script.append(f'--download-trial="{review_host}/api/v1/edit-groups/{groups["Trial"]}/dump-editset/"')
+
+            if print_only:
+                print(" ".join(script))
+                print("")
+            else:
+                job_id = hashlib.sha256(target_name.encode("utf-8")).hexdigest()[0:30]
+                targets.append(
+                    (
+                        f"coord-{job_id}",
+                        " ".join(script),
+                    )
+                )
+
+    for container_name, script in targets:
+        launch_job(
+            target_user=toolforge_user,
+            name=container_name,
+            image=container_image,
+            command=script,
+        )
+
+        while True:
+            if job_has_completed(toolforge_user, container_name):
+                logger.info(f"Job has completed: {container_name}")
+                break
+
+            logger.info(f"Waiting for job to complete: {container_name}")
+            time.sleep(1)
 
 
 @cli.command()
-@click.pass_context
-@click.option('--output', help='Target file',
-              default='edits.xml', required=True)
-@click.option('--edit-set', '-es', help='Edit Sets to include',
-              multiple=True, type=int)
-@click.option('--random-edits', is_flag=True, help='Download random edits')
-@click.option('--random-edits-count', default=200, help='Number of random edits to download')
-def download_edits(ctx: click.Context,
-                   output: str,
-                   edit_set: List[int],
-                   random_edits: bool,
-                   random_edits_count: int) -> None:
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(dump_edits(ctx.obj,
-                                       PosixPath(output),
-                                       edit_set or None,
-                                       random_edits,
-                                       random_edits_count))
+@click.option("--base-dir", type=click.Path(), default="/data/project/cluebotng-trainer/public_html")
+def run_file_api(base_dir: str) -> None:
+    file_api = FileApi(PosixPath(base_dir))
+    file_api.run()
 
 
-@cli.command()
-@click.option('--ann-input', help='Edit set for the ANN training',
-              required=True, default='train-edits.xml', type=click.Path(True))
-@click.option('--bayes-input', help='Edit set for the bayes training',
-              required=True, default='bayes-edits.xml', type=click.Path(True))
-@click.option('--output', help='Target directory',
-              required=True, type=click.Path(True))
-@click.option('--release-tag', help='Git release tag',
-              required=True, default='v1.0.2')
-def build_database(ann_input: PosixPath,
-                   bayes_input: PosixPath,
-                   output: PosixPath,
-                   release_tag: str) -> None:
-    output = PosixPath(output)
-    core_image = build_docker_image(output, release_tag)
-    stdout = run_container(core_image,
-                           [(PosixPath(bayes_input).absolute().as_posix(),
-                             '/edits.xml'),
-                            (output.absolute().as_posix(),
-                             '/opt/cbng-core/data/')],
-                           ['/opt/cbng-core/cluebotng', '-c', 'conf',
-                            '-m', 'bayes_train', '-f', '/edits.xml'])
-    logger.info(f'Finished bayes_train: {stdout.decode("utf-8")}')
-
-    stdout = run_container(core_image,
-                           [(output.absolute().as_posix(), '/opt/cbng-core/data/')],
-                           ['/opt/cbng-core/create_bayes_db', 'data/bayes.db',
-                            'data/main_bayes_train.dat'])
-    logger.info(f'Finished create_bayes_db (bayes): {stdout.decode("utf-8")}')
-
-    stdout = run_container(core_image,
-                           [(output.absolute().as_posix(), '/opt/cbng-core/data/')],
-                           ['/opt/cbng-core/create_bayes_db', 'data/two_bayes.db',
-                            'data/two_bayes_train.dat'])
-    logger.info(f'Finished create_bayes_db (two_bayes): {stdout.decode("utf-8")}')
-
-    stdout = run_container(core_image,
-                           [(PosixPath(ann_input).absolute().as_posix(), '/edits.xml'),
-                            (output.absolute().as_posix(), '/opt/cbng-core/data/')],
-                           ['/opt/cbng-core/cluebotng', '-c', 'conf',
-                            '-m', 'ann_train', '-f', '/edits.xml'])
-    logger.info(f'Finished ann_train: {stdout.decode("utf-8")}')
-
-    stdout = run_container(core_image,
-                           [(output.absolute().as_posix(), '/opt/cbng-core/data/')],
-                           ['/opt/cbng-core/create_ann', 'data/main_ann.fann',
-                            'data/main_ann_train.dat', '150', '0.037', '100'])
-    logger.info(f'Finished create_ann: {stdout.decode("utf-8")}')
-
-
-@cli.command()
-@click.option('--input', help='Edits file', required=True, default='edits.xml',
-              type=click.Path(True))
-@click.option('--output', help='Output path', required=False, type=click.Path(True))
-@click.option('--release-tag', help='Git release tag', required=True, default='v1.0.2')
-def trial_database(input: PosixPath,
-                   output: PosixPath,
-                   release_tag: str) -> None:
-    output = PosixPath(output)
-    core_image = build_docker_image(output, release_tag)
-
-    # Create a folder for all trial data
-    trial_path = (output / 'trialreport')
-    trial_path.mkdir(exist_ok=True)
-
-    # Run the trial edit set
-    stdout = run_container(core_image,
-                           [(PosixPath(input).absolute().as_posix(), '/edits.xml'),
-                            (output.absolute().as_posix(), '/opt/cbng-core/data/'),
-                            (trial_path.absolute().as_posix(), '/opt/cbng-core/trialreport/')],
-                           ['/opt/cbng-core/cluebotng', '-c', 'conf',
-                            '-m', 'trial_run', '-f', '/edits.xml'])
-    logger.info(f'Finished trial_run: {stdout.decode("utf-8")}')
-
-    # Plot the trial results
-    for name, plot in {
-        'threshold': plots.THREASHOLD,
-        'false_positive_rate': plots.FALSE_POSITIVE
-    }.items():
-        # Write the plot file out to process
-        plot_file = trial_path / f'{name}.gnuplot'
-        with plot_file.open('w') as fh:
-            fh.write(plot)
-
-        # Process the plot file
-        stdout = run_container(core_image,
-                               [(trial_path.absolute().as_posix(), '/opt/cbng-core/trialreport/')],
-                               ['gnuplot', f'{name}.gnuplot'],
-                               '/opt/cbng-core/trialreport/',
-                               False)
-        logger.info(f'Finished {name} plot: {stdout.decode("utf-8")}')
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     cli()
