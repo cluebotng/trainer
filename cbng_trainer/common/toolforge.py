@@ -1,6 +1,5 @@
 import logging
 import os
-from urllib.parse import urlparse
 
 from requests import HTTPError
 from toolforge_weld.api_client import ToolforgeClient
@@ -11,15 +10,10 @@ logger = logging.getLogger(__name__)
 
 
 def _client_config():
-    try:
-        # The common config isn't mounted in the container, so fallback to a known value
-        config = load_config("cluebotng-trainer")
-        server = f"{config.api_gateway.url}{config.jobs.jobs_endpoint}"
-    except KeyError:
-        server = os.environ.get("TOOL_TOOLFORGE_API_URL", "https://localhost:30003")
-
+    tool_name = os.environ.get("TOOL_NAME", "cluebotng-trainer")
+    config = load_config(tool_name)
     return ToolforgeClient(
-        server=server,
+        server=f"{config.api_gateway.url}",
         kubeconfig=Kubeconfig.load(),
         user_agent="ClueBot NG Trainer",
     )
