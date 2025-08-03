@@ -51,7 +51,6 @@ def _generate_launch_script(
     download_bins_url: Optional[str] = None,
     download_edit_set_url: Optional[str] = None,
     override_file_urls: Optional[Dict[str, str]] = None,
-    run_core: bool = True,
     skip_setup: bool = False,
 ) -> str:
     setup_script = "#!/bin/bash\n"
@@ -102,12 +101,8 @@ def _generate_launch_script(
     if download_edit_set_url:
         setup_script += f"curl -sL --output /tmp/cbng-core/edits.xml {download_edit_set_url}\n"
 
-    if run_core:
-        setup_script += "cd /tmp/cbng-core && ./cluebotng -l -m live_run"
-    else:
-        setup_script += "touch /tmp/container_ready\n"
-        setup_script += "sleep infinity\n"
-
+    setup_script += "touch /tmp/container_ready\n"
+    setup_script += "sleep infinity\n"
     return setup_script
 
 
@@ -115,13 +110,10 @@ def _launch_container(
     namespace: str,
     name: str,
     setup_script: str,
-    run_core: bool,
     timeout: int,
     image: str,
 ):
     encoded_script = base64.b64encode(setup_script.encode("utf-8")).decode("utf-8")
-
-    probe = {"tcpSocket": {"port": 3565}} if run_core else {"exec": {"command": ["test", "-f", "/tmp/container_ready"]}}
 
     # Create the pod
     core_v1 = _get_client()
@@ -160,9 +152,7 @@ def _launch_container(
                                 },
                             }
                         ],
-                        "ports": [{"containerPort": 3565, "protocol": "TCP"}] if run_core else [],
-                        "readinessProbe": probe,
-                        "livenessProbe": probe,
+                        "readinessProbe": {"exec": {"command": ["test", "-f", "/tmp/container_ready"]}},
                     }
                 ],
             },
@@ -198,7 +188,6 @@ def run_container(
     download_edit_set_url: Optional[str] = None,
     download_bins_url: Optional[str] = None,
     override_file_urls: Optional[Dict[str, str]] = None,
-    run_core: bool = False,
     skip_setup: bool = False,
     timeout: int = 60,
     image: str = "docker-registry.tools.wmflabs.org/toolforge-bookworm-sssd:latest",
@@ -206,7 +195,7 @@ def run_container(
     if not name:
         name = uuid.uuid4().hex
     setup_script = _generate_launch_script(
-        release_ref, download_bins_url, download_edit_set_url, override_file_urls, run_core, skip_setup
+        release_ref, download_bins_url, download_edit_set_url, override_file_urls, skip_setup
     )
 
     logger.info(f"Spawning container {name} in {namespace}")
@@ -216,7 +205,6 @@ def run_container(
             name=name,
             image=image,
             setup_script=setup_script,
-            run_core=run_core,
             timeout=timeout,
         )
 
