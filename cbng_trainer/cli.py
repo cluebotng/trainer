@@ -239,7 +239,7 @@ def run_edit_sets(
             job_name=container_name,
             image_name=image_name,
             skip_setup=True,
-            run_commands=[script],
+            run_commands=[f'timeout 2h {script}'],
         )
 
 
