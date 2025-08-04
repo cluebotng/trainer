@@ -238,6 +238,7 @@ def run_edit_sets(
             target_user=toolforge_user,
             job_name=container_name,
             image_name=image_name,
+            skip_setup=True,
             run_commands=[script],
         )
 
