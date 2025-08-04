@@ -10,7 +10,7 @@ def calculate_target_path(
     target_file: Optional[str] = None,
     create_plots: bool = False,
 ) -> str:
-    endpoint = f'{base_url.lstrip("/")}'
+    endpoint = f'{base_url.rstrip("/")}'
     if create_plots:
         endpoint += f"/api/create-plots"
 

@@ -22,7 +22,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from typing import Dict, List
+import base64
+from pathlib import PosixPath
+from typing import Dict, List, Optional
 
 import requests
 
@@ -31,16 +33,6 @@ def get_latest_github_release(org: str, repo: str):
     r = requests.get(f"https://api.github.com/repos/{org}/{repo}/releases/latest")
     r.raise_for_status()
     return r.json()["tag_name"]
-
-
-def download_wp_edit(edit_id: int) -> str:
-    r = requests.get(f"https://cluebotng-review.toolforge.org/api/v1/edit/{edit_id}/dump-wpedit/")
-    r.raise_for_status()
-    return r.text
-
-
-def wp_edit_as_edit_set(wp_edit: str) -> str:
-    return f'<?xml version="1.0"?><WPEditSet>{wp_edit}</WPEditSet>'
 
 
 def get_target_edit_groups(review_host: str, filter_edit_set: List[str]) -> Dict[str, Dict[str, int]]:
@@ -61,3 +53,102 @@ def get_target_edit_groups(review_host: str, filter_edit_set: List[str]) -> Dict
     return {
         name: groups for name, groups in mapped_edit_groups.items() if not filter_edit_set or name in filter_edit_set
     }
+
+
+def generate_execution_script(
+    release_ref: str,
+    download_bins_url: Optional[str] = None,
+    download_edit_set_url: Optional[str] = None,
+    override_file_urls: Optional[Dict[str, str]] = None,
+    skip_setup: bool = False,
+    skip_binary_setup: bool = False,
+    run_commands: Optional[List[str]] = None,
+) -> str:
+    setup_script = "#!/bin/bash\n"
+    # Don't expose the secret
+    setup_script += 'echo -e "Authorization:Bearer ${CBNG_TRAINER_FILE_API_KEY}" > /tmp/file-api-headers\n'
+    # Expose everything else
+    setup_script += "set -xe\n"
+
+    # Helper functions
+    setup_script += """
+    # Helper function, similar to what we had in Python
+    # Note: Avoids the secret being exposed by reading the headers from disk
+    function upload_file() {
+        source_path=$1
+        target_url=$2
+        if [ -s "${source_path}" ];
+        then
+            curl --fail -H@/tmp/file-api-headers --data-binary "@${source_path}" "${target_url}"
+        else
+            echo "Not upload ${source_path} - source is empty"
+        fi
+    }
+    """
+
+    files_to_download = {}
+    if not skip_setup:
+        setup_script += f"""
+        mkdir -p /tmp/cbng-core
+
+        # Binaries we need to run
+        for bin in cluebotng create_ann create_bayes_db print_bayes_db;
+        do
+            curl --fail -s -L --output /tmp/cbng-core/$bin https://github.com/cluebotng/core/releases/download/{release_ref}/$bin
+            chmod 755 /tmp/cbng-core/$bin
+        done
+
+        # Config we need to run
+        curl --fail -s -L --output /tmp/conf.tar.gz https://github.com/cluebotng/core/releases/download/{release_ref}/conf.tar.gz
+        tar -C /tmp/cbng-core/ -xvf /tmp/conf.tar.gz
+
+        # Hack to not require a tty
+        sed -i s'/, "train_outputs"//g' /tmp/cbng-core/conf/cluebotng.conf
+        """
+
+        if not skip_binary_setup:
+            download_url = (
+                download_bins_url
+                if download_bins_url
+                else f"https://github.com/cluebotng/core/releases/download/{release_ref}"
+            )
+
+            files_to_download |= {
+                "data/bayes.db": f"{download_url}/bayes.db",
+                "data/two_bayes.db": f"{download_url}/two_bayes.db",
+                "data/main_ann.fann": f"{download_url}/main_ann.fann",
+            }
+
+        if download_edit_set_url:
+            files_to_download |= {"edits.xml": download_edit_set_url}
+
+    for name, url in (override_file_urls or {}).items():
+        if url is None:
+            if name in files_to_download:
+                del files_to_download[name]
+            continue
+        files_to_download[name] = url
+
+    if files_to_download:
+        setup_script += "# Ensure target directories exist\n"
+        for path in set([PosixPath(path).parent for path in files_to_download if PosixPath(path).parent != "."]):
+            setup_script += f"mkdir -p '/tmp/cbng-core/{path}'\n"
+
+        setup_script += "# Download files\n"
+        for path, url in files_to_download.items():
+            setup_script += f"curl --fail -s -L --output '/tmp/cbng-core/{path}' '{url}'\n"
+
+    if run_commands:
+        setup_script += "# Commands\n"
+        for command in run_commands:
+            setup_script += f"{command}\n"
+    else:
+        setup_script += "# Wait for interaction\n"
+        setup_script += "touch /tmp/container_ready\n"
+        setup_script += "sleep infinity\n"
+    return setup_script
+
+
+def generate_command_command(setup_script: str) -> str:
+    encoded_script = base64.b64encode(setup_script.encode("utf-8")).decode("utf-8")
+    return f"bash -c 'base64 -d <<<{encoded_script} > /tmp/setup.sh && chmod 755 /tmp/setup.sh && /tmp/setup.sh'"

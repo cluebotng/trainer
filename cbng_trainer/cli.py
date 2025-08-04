@@ -22,10 +22,9 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
-import hashlib
 import logging
+import re
 import sys
-import time
 from datetime import datetime, timezone
 from pathlib import PosixPath
 from typing import Optional, List
@@ -33,18 +32,9 @@ from typing import Optional, List
 import click
 
 from cbng_trainer.api import FileApi
-from cbng_trainer.common import steps
 from cbng_trainer.common.files import calculate_target_path
-from cbng_trainer.common.steps import (
-    store_edit_sets,
-    run_bayes_train,
-    create_main_bayes_db,
-    create_two_bayes_db,
-    run_ann_train,
-    run_create_ann,
-    create_plots,
-)
-from cbng_trainer.common.toolforge import launch_job, job_has_completed
+from cbng_trainer.common.steps import Steps
+from cbng_trainer.common.toolforge import run_job
 from cbng_trainer.common.utils import (
     get_target_edit_groups,
     get_latest_github_release,
@@ -66,21 +56,26 @@ def cli() -> None:
 @click.option("--download-training", required=True)
 @click.option("--download-trial", required=False)
 # Internal
-@click.option("--kubernetes-namespace", required=True)
-@click.option("--container-image", default="tool-cluebotng-trainer/backend-service:latest", required=True)
+@click.option("--toolforge-user", default="cluebotng-trainer", required=True)
+@click.option("--image-name", required=True)
 @click.option("--release-ref", required=True)
 @click.option("--trainer-host", required=True)
 def run_edit_set(
     target_name: str,
     instance_name: str,
-    kubernetes_namespace: str,
-    container_image: str,
+    toolforge_user: str,
+    image_name: str,
     release_ref: str,
     trainer_host: str,
     download_training: str,
     download_trial: Optional[str],
 ) -> None:
-    job_id = hashlib.sha256(target_name.encode("utf-8")).hexdigest()[0:30]
+    steps = Steps(
+        toolforge_user=toolforge_user,
+        job_name=re.sub(r"[^A-Za-z0-9]", "-", target_name).lower(),
+        image_name=image_name,
+        release_ref=release_ref,
+    )
 
     # Download the files
     files_to_download = {
@@ -91,84 +86,69 @@ def run_edit_set(
             download_trial: calculate_target_path(trainer_host, target_name, instance_name, "edit-sets", "trial.xml")
         }
 
-    logger.info("Downloading files")
-    if not store_edit_sets(
-        container_namespace=kubernetes_namespace,
-        container_name=f"{job_id}-download",
-        mapping=files_to_download,
-    ):
+    # logger.info("Downloading files")
+    if not steps.store_edit_sets(mapping=files_to_download):
+        logger.error("Downloading files failed")
         return
 
     # Build
     logger.info("Running bayes train")
-    if not run_bayes_train(
+    if not steps.run_bayes_train(
         download_edit_set_url=files_to_download[download_training],
         upload_files_url=calculate_target_path(trainer_host, target_name, instance_name, "artifacts"),
-        container_namespace=kubernetes_namespace,
-        container_name=f"{job_id}-bayes-train",
-        release_ref=release_ref,
     ):
+        logger.error("Bayes train failed")
         return
 
-    logger.info("Creating main bayes database")
-    if not create_main_bayes_db(
+    logger.info("Creating bayes databases")
+    if not steps.create_main_bayes_db(
         download_edit_set_url=files_to_download[download_training],
         upload_files_url=calculate_target_path(trainer_host, target_name, instance_name, "artifacts"),
-        container_namespace=kubernetes_namespace,
-        container_name=f"{job_id}-main-bayes-db",
-        release_ref=release_ref,
     ):
+        logger.error("Main main bayes db failed")
         return
 
-    logger.info("Creating two bayes database")
-    if not create_two_bayes_db(
+    logger.info("Creating two bayes databases")
+    if not steps.create_two_bayes_db(
         download_edit_set_url=files_to_download[download_training],
         upload_files_url=calculate_target_path(trainer_host, target_name, instance_name, "artifacts"),
-        container_namespace=kubernetes_namespace,
-        container_name=f"{job_id}-two-bayes-db",
-        release_ref=release_ref,
     ):
+        logger.error("Two bayes db failed")
         return
 
     logger.info("Running ann train")
-    if not run_ann_train(
+    if not steps.run_ann_train(
         download_edit_set_url=files_to_download[download_training],
         upload_files_url=calculate_target_path(trainer_host, target_name, instance_name, "artifacts"),
-        container_namespace=kubernetes_namespace,
-        container_name=f"{job_id}-ann-train",
-        release_ref=release_ref,
     ):
+        logger.error("Ann train failed")
         return
 
     logger.info("Running ann create")
-    if not run_create_ann(
+    if not steps.run_create_ann(
         download_edit_set_url=files_to_download[download_training],
         upload_files_url=calculate_target_path(trainer_host, target_name, instance_name, "artifacts"),
-        container_namespace=kubernetes_namespace,
-        container_name=f"{job_id}-ann-create",
-        release_ref=release_ref,
     ):
+        logger.error("Ann create failed")
         return
 
     # Run trial
     if download_trial:
         logger.info("Executing trial")
-        steps.run_trial_report(
+        if not steps.run_trial_report(
             download_edit_set_url=files_to_download[download_trial],
             download_bins_url=calculate_target_path(trainer_host, target_name, instance_name, "artifacts"),
             upload_report_url=calculate_target_path(trainer_host, target_name, instance_name, "trial"),
-            container_namespace=kubernetes_namespace,
-            container_name=f"{job_id}-trial",
-            release_ref=release_ref,
-        )
+        ):
+            logger.error("Trial report failed")
+            return
 
-        logger.info("Creating plots via API")
-        create_plots(
-            container_namespace=kubernetes_namespace,
-            container_name=f"{job_id}-create-plots",
-            image_tag=container_image,
+        logger.info("Creating plots")
+        if not steps.create_plots(
             upload_report_url=calculate_target_path(trainer_host, target_name, instance_name, "trial"),
-        )
+        ):
+            logger.error("Result plotting failed")
+            return
 
 
 # "Job coordinator" - figures out which groups we need to perform a run for and creates a job for each
@@ -177,9 +157,8 @@ def run_edit_set(
 @click.option("--print-only/--no-print-only", default=False)
 # These are essentially constants
 @click.option("--toolforge-user", default="cluebotng-trainer", required=True)
-@click.option("--kubernetes-namespace", default="tool-cluebotng-trainer", required=True)
 @click.option(
-    "--container-image", default="tools-harbor.wmcloud.org/tool-cluebotng-trainer/backend-service:latest", required=True
+    "--image-name", default="tools-harbor.wmcloud.org/tool-cluebotng-trainer/backend-service:latest", required=True
 )
 @click.option(
     "--review-host", default="http://cluebotng-review.tool-cluebotng-review.svc.tools.local:8000", required=True
@@ -192,8 +171,7 @@ def run_edit_sets(
     edit_set: List[str],
     print_only: bool,
     toolforge_user: str,
-    kubernetes_namespace: str,
-    container_image: str,
+    image_name: str,
     review_host: str,
     trainer_host: str,
     release_ref: Optional[str],
@@ -228,23 +206,26 @@ def run_edit_sets(
             script = [
                 "cbng-trainer",
                 "run-edit-set",
-                f'--kubernetes-namespace="{kubernetes_namespace}"',
+                f'--image-name="{image_name}"',
                 f'--target-name="{target_name}"',
-                f'--container-image="{container_image}"',
                 f'--instance-name="{run_instance}"',
                 f'--release-ref="{release_ref}"',
                 f'--trainer-host="{trainer_host}"',
             ]
             if group_name in {"Generic", "Reported False Positives", "Training"}:
-                script.append(f'--download-training="{review_host}/api/v1/edit-groups/{group_id}/dump-editset/"')
+                script.append(
+                    f'--download-training="{review_host.rstrip("/")}/api/v1/edit-groups/{group_id}/dump-editset/"'
+                )
             if "Trial" in groups:
-                script.append(f'--download-trial="{review_host}/api/v1/edit-groups/{groups["Trial"]}/dump-editset/"')
+                script.append(
+                    f'--download-trial="{review_host.rstrip("/")}/api/v1/edit-groups/{groups["Trial"]}/dump-editset/"'
+                )
 
             if print_only:
                 print(" ".join(script))
                 print("")
             else:
-                job_id = hashlib.sha256(target_name.encode("utf-8")).hexdigest()[0:30]
+                job_id = re.sub(r"[^A-Za-z0-9]", "-", target_name).lower()
                 targets.append(
                     (
                         f"coord-{job_id}",
@@ -253,20 +234,12 @@ def run_edit_sets(
                 )
 
     for container_name, script in targets:
-        launch_job(
+        run_job(
             target_user=toolforge_user,
-            name=container_name,
-            image=container_image,
-            command=script,
+            job_name=container_name,
+            image_name=image_name,
+            run_commands=[script],
         )
-
-        while True:
-            if job_has_completed(toolforge_user, container_name):
-                logger.info(f"Job has completed: {container_name}")
-                break
-
-            logger.info(f"Waiting for job to complete: {container_name}")
-            time.sleep(1)
 
 
 @cli.command()
