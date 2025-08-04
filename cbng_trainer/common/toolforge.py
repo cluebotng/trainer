@@ -114,14 +114,19 @@ def run_job(
     )
 
     kubernetes_namespace = f"tool-{target_user}"
+    job_has_been_running = False
     while True:
         if _job_is_running(target_user, job_name):
+            job_has_been_running = True
             pod_name = get_pod_name_for_job(kubernetes_namespace, job_name)
             if is_container_running(kubernetes_namespace, pod_name):
                 logger.info(f"Container has actually started...")
                 break
             logger.info("Job is running, but container is not...")
         else:
+            if job_has_been_running:
+                logger.error(f'Job is not running, but was previously... likely failed')
+                return False
             logger.info("Job is not running...")
         time.sleep(1)
 
