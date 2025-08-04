@@ -27,6 +27,7 @@ import logging
 import uuid
 from typing import Dict
 
+from cbng_trainer.common.consts import THREASHOLDS_PLOT, FALSE_POSITIVES_PLOT
 from cbng_trainer.common.toolforge import run_job
 
 logger = logging.getLogger(__name__)
@@ -200,28 +201,8 @@ class Steps:
     def create_plots(self, upload_report_url: str) -> bool:
         run_commands = []
         for name, plot in {
-            "falsepositives": """
-set terminal png
-set output 'falsepositives.png'
-
-set title 'Vandalism Detection Rate by False Positives'
-set xlabel 'False Positive Rate'
-set ylabel 'Portion of Vandalism'
-set xrange [0.0:0.02]
-set grid
-
-plot 'thresholdtable.txt' using 3:2 title 'Vandalism Detection Rate' with lines
-            """,
-            "thresholds": """
-set terminal png
-set output 'thresholds.png'
-
-set title 'Detection Rates By Threshold'
-set xlabel 'Score Vandalism Threshold'
-set ylabel 'Detection Rate'
-
-plot 'thresholdtable.txt' using 1:2 title 'Correct Positive %' with lines, 'thresholdtable.txt' using 1:3 title 'False Positive %' with lines
-            """,
+            "falsepositives": FALSE_POSITIVES_PLOT,
+            "thresholds": THREASHOLDS_PLOT,
         }.items():
             run_commands.extend(
                 [

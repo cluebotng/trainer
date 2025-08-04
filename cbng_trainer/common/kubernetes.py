@@ -23,13 +23,10 @@ SOFTWARE.
 """
 
 import logging
-from typing import Tuple
 
 import urllib3
 from kubernetes import config
 from kubernetes.client.api import core_v1_api
-from kubernetes.stream import stream
-from kubernetes.stream.ws_client import ERROR_CHANNEL
 
 logger = logging.getLogger(__name__)
 
@@ -38,36 +35,6 @@ def _get_client():
     urllib3.disable_warnings()
     config.load_kube_config()
     return core_v1_api.CoreV1Api()
-
-
-def execute_in_container(pod_namespace: str, pod_name: str, command: str) -> Tuple[bool, str, str]:
-    core_v1 = _get_client()
-    resp = stream(
-        core_v1.connect_get_namespaced_pod_exec,
-        namespace=pod_namespace,
-        name=pod_name,
-        command=command,
-        stderr=True,
-        stdin=False,
-        stdout=True,
-        tty=False,
-        _preload_content=False,
-    )
-
-    stdout, stderr = "", ""
-    while resp.is_open():
-        resp.update(timeout=1)
-        if resp.peek_stdout():
-            stdout += resp.read_stdout()
-        if resp.peek_stderr():
-            stderr += resp.read_stderr()
-
-    if error_details := resp.read_channel(ERROR_CHANNEL):
-        if '"status":"Failure"' in error_details:
-            logger.debug(f"Command execution failed: {error_details}")
-            return False, stdout, stderr
-
-    return True, stdout, stderr
 
 
 def get_pod_name_for_job(pod_namespace: str, job_name: str) -> str:

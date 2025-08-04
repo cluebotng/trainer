@@ -95,6 +95,7 @@ def run_job(
     run_commands: Optional[List[str]] = None,
     skip_setup: bool = False,
     skip_binary_setup: bool = False,
+    run_timeout: str = "2h",
 ):
     execution_script = generate_execution_script(
         release_ref,
@@ -110,7 +111,7 @@ def run_job(
         target_user=target_user,
         job_name=job_name,
         image=image_name,
-        command=generate_command_command(execution_script),
+        command=generate_command_command(execution_script, run_timeout),
     )
 
     kubernetes_namespace = f"tool-{target_user}"
@@ -120,12 +121,12 @@ def run_job(
             job_has_been_running = True
             pod_name = get_pod_name_for_job(kubernetes_namespace, job_name)
             if is_container_running(kubernetes_namespace, pod_name):
-                logger.info(f"Container has actually started...")
+                logger.info("Container has actually started...")
                 break
             logger.info("Job is running, but container is not...")
         else:
             if job_has_been_running:
-                logger.error(f'Job is not running, but was previously... likely failed')
+                logger.error("Job is not running, but was previously... likely failed")
                 return False
             logger.info("Job is not running...")
         time.sleep(1)
@@ -134,12 +135,12 @@ def run_job(
     logger.debug("Waiting for job to finish")
     while True:
         if not _job_is_running(target_user, job_name):
-            logger.info(f"Job is no longer running...")
+            logger.info("Job is no longer running...")
             for line in logs:
                 logger.info(line)
             break
 
-        logger.debug(f"Job is still running, grabbing logs...")
+        logger.debug("Job is still running, grabbing logs...")
         logs = _read_logs(target_user=target_user, job_name=job_name)
         time.sleep(1)
 

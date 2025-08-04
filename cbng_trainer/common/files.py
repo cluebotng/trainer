@@ -12,7 +12,7 @@ def calculate_target_path(
 ) -> str:
     endpoint = f'{base_url.rstrip("/")}'
     if create_plots:
-        endpoint += f"/api/create-plots"
+        endpoint += "/api/create-plots"
 
     endpoint += f"/{quote(target_group)}/{quote(target_instance)}/{quote(target_type)}"
     if target_file:

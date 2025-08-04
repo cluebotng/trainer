@@ -149,6 +149,10 @@ def generate_execution_script(
     return setup_script
 
 
-def generate_command_command(setup_script: str) -> str:
+def generate_command_command(setup_script: str, run_timeout: str) -> str:
     encoded_script = base64.b64encode(setup_script.encode("utf-8")).decode("utf-8")
-    return f"bash -c 'base64 -d <<<{encoded_script} > /tmp/setup.sh && chmod 755 /tmp/setup.sh && /tmp/setup.sh'"
+    return (
+        f"bash -c 'base64 -d <<<{encoded_script} > /tmp/setup.sh && "
+        f"chmod 755 /tmp/setup.sh && "
+        f"timeout {run_timeout} /tmp/setup.sh'"
+    )
