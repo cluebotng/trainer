@@ -122,6 +122,7 @@ def run_job(
     run_commands: Optional[List[str]] = None,
     skip_setup: bool = False,
     skip_binary_setup: bool = False,
+    wait_for_completion: bool = True,
     run_timeout: str = "2h",
 ):
     execution_script = generate_execution_script(
@@ -140,6 +141,9 @@ def run_job(
         image=image_name,
         command=generate_command_command(execution_script, run_timeout),
     )
+
+    if not wait_for_completion:
+        return True
 
     while True:
         start_time = _wait_for_job_to_start(

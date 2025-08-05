@@ -23,6 +23,7 @@ SOFTWARE.
 """
 
 import base64
+import re
 from pathlib import PosixPath
 from typing import Dict, List, Optional
 
@@ -156,3 +157,15 @@ def generate_command_command(setup_script: str, run_timeout: str) -> str:
         f"chmod 755 /tmp/setup.sh && "
         f"timeout {run_timeout} /tmp/setup.sh'"
     )
+
+
+def clean_job_name(name: str, prefix: Optional[str] = None, postfix: Optional[str] = None) -> str:
+    job_name = name
+    if prefix:
+        job_name = f"{prefix}-{job_name}"
+    if postfix:
+        job_name = f"{job_name}-{postfix}"
+    job_name = re.sub(r"[^A-Za-z0-9]", "-", job_name).lower()
+    while "--" in job_name:
+        job_name = job_name.replace("--", "")
+    return job_name[0:50]

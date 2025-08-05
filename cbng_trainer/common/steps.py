@@ -29,6 +29,7 @@ from typing import Dict
 
 from cbng_trainer.common.consts import THREASHOLDS_PLOT, FALSE_POSITIVES_PLOT
 from cbng_trainer.common.toolforge import run_job
+from cbng_trainer.common.utils import clean_job_name
 
 logger = logging.getLogger(__name__)
 
@@ -36,12 +37,12 @@ logger = logging.getLogger(__name__)
 class Steps:
     def __init__(
         self,
-        job_name: str,
+        target_name: str,
         toolforge_user: str,
         image_name: str,
         release_ref: str,
     ):
-        self.job_name = job_name
+        self.target_name = target_name
         self.toolforge_user = toolforge_user
         self.image_name = image_name
         self.release_ref = release_ref
@@ -55,7 +56,7 @@ class Steps:
 
         return run_job(
             target_user=self.toolforge_user,
-            job_name=f"{self.job_name}-store-edit-sets",
+            job_name=clean_job_name(self.target_name, postfix="store-edit-sets"),
             image_name=self.image_name,
             skip_setup=True,
             run_commands=commands,
@@ -68,7 +69,7 @@ class Steps:
     ) -> bool:
         return run_job(
             target_user=self.toolforge_user,
-            job_name=f"{self.job_name}-bayes-train",
+            job_name=clean_job_name(self.target_name, postfix="bayes-train"),
             image_name=self.image_name,
             release_ref=self.release_ref,
             download_edit_set_url=download_edit_set_url,
@@ -87,7 +88,7 @@ class Steps:
     ) -> bool:
         return run_job(
             target_user=self.toolforge_user,
-            job_name=f"{self.job_name}-create-main-bayes-db",
+            job_name=clean_job_name(self.target_name, postfix="create-main-bayes-db"),
             image_name=self.image_name,
             release_ref=self.release_ref,
             download_edit_set_url=download_edit_set_url,
@@ -109,7 +110,7 @@ class Steps:
     ) -> bool:
         return run_job(
             target_user=self.toolforge_user,
-            job_name=f"{self.job_name}-create-two-bayes-db",
+            job_name=clean_job_name(self.target_name, postfix="create-two-bayes-db"),
             image_name=self.image_name,
             release_ref=self.release_ref,
             download_edit_set_url=download_edit_set_url,
@@ -131,7 +132,7 @@ class Steps:
     ) -> bool:
         return run_job(
             target_user=self.toolforge_user,
-            job_name=f"{self.job_name}-ann-train",
+            job_name=clean_job_name(self.target_name, postfix="ann-train"),
             image_name=self.image_name,
             release_ref=self.release_ref,
             download_edit_set_url=download_edit_set_url,
@@ -154,7 +155,7 @@ class Steps:
     ) -> bool:
         return run_job(
             target_user=self.toolforge_user,
-            job_name=f"{self.job_name}-create-ann",
+            job_name=clean_job_name(self.target_name, postfix="create-ann"),
             image_name=self.image_name,
             release_ref=self.release_ref,
             download_edit_set_url=download_edit_set_url,
@@ -177,7 +178,7 @@ class Steps:
     ) -> bool:
         return run_job(
             target_user=self.toolforge_user,
-            job_name=f"{self.job_name}-trial-report",
+            job_name=clean_job_name(self.target_name, postfix="trial-report"),
             image_name=self.image_name,
             release_ref=self.release_ref,
             download_bins_url=download_bins_url,
@@ -222,7 +223,7 @@ class Steps:
 
         return run_job(
             target_user=self.toolforge_user,
-            job_name=f"{self.job_name}-create-plots",
+            job_name=clean_job_name(self.target_name, postfix="create-plots"),
             image_name=self.image_name,
             skip_setup=True,
             override_file_urls={

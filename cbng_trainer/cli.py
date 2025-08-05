@@ -23,7 +23,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 import logging
-import re
 import sys
 from datetime import datetime, timezone
 from pathlib import PosixPath
@@ -38,6 +37,7 @@ from cbng_trainer.common.toolforge import run_job
 from cbng_trainer.common.utils import (
     get_target_edit_groups,
     get_latest_github_release,
+    clean_job_name,
 )
 
 logger = logging.getLogger(__name__)
@@ -72,7 +72,7 @@ def run_edit_set(
 ) -> None:
     steps = Steps(
         toolforge_user=toolforge_user,
-        job_name=re.sub(r"[^A-Za-z0-9]", "-", target_name).lower(),
+        target_name=target_name,
         image_name=image_name,
         release_ref=release_ref,
     )
@@ -225,10 +225,9 @@ def run_edit_sets(
                 print(" ".join(script))
                 print("")
             else:
-                job_id = re.sub(r"[^A-Za-z0-9]", "-", target_name).lower()
                 targets.append(
                     (
-                        f"coord-{job_id}",
+                        clean_job_name(target_name, prefix="coord"),
                         " ".join(script),
                     )
                 )
@@ -240,6 +239,7 @@ def run_edit_sets(
             image_name=image_name,
             skip_setup=True,
             run_commands=[script],
+            wait_for_completion=False,
         )
 
 
