@@ -1,14 +1,15 @@
 import json
 import logging
+import re
 import time
-from typing import Optional, Dict, List
+from datetime import datetime
+from typing import Optional, Dict, List, Any
 
 from requests import HTTPError
 from toolforge_weld.api_client import ToolforgeClient
 from toolforge_weld.config import load_config
 from toolforge_weld.kubernetes_config import Kubeconfig
 
-from cbng_trainer.common.kubernetes import get_pod_name_for_job, is_container_running
 from cbng_trainer.common.utils import generate_execution_script, generate_command_command
 
 logger = logging.getLogger(__name__)
@@ -69,19 +70,45 @@ def _job_is_running(target_user: str, name: str) -> bool:
     return "Running for " in resp["job"]["status_short"]
 
 
-def _read_logs(target_user: str, job_name: str) -> List:
+def _wait_for_job_to_start(target_user: str, job_name: str) -> Optional[datetime]:
+    api = _client_config(target_user)
+    try:
+        resp = api.get(f"/jobs/v1/tool/{target_user}/jobs/{job_name}/")
+    except HTTPError as e:
+        if e.response.status_code == 404:
+            return None
+        logger.error(f"Failed to get {job_name}: [{e.response.status_code}] {e.response.text}")
+        return None
+
+    if match := re.match(r"^Last run at (.+)\. Pod in 'Running' phase\.", resp["job"]["status_long"]):
+        return datetime.fromisoformat(match.group(1))
+    return None
+
+
+def _read_logs(target_user: str, job_name: str, start_time: datetime) -> List[Dict[str, Any]]:
     api = _client_config(target_user)
 
-    log_lines = []
+    logs = []
     for raw_line in api.get_raw_lines(
         f"/jobs/v1/tool/{target_user}/jobs/{job_name}/logs/",
         params={"follow": "false"},
-        timeout=None,
+        timeout=10,
     ):
-        parsed = json.loads(raw_line)
-        log_lines.append(f"[{parsed['pod']}] {parsed['message']}")
+        log = json.loads(raw_line)
+        log["datetime"] = datetime.fromisoformat(log["datetime"])
+        if log["datetime"] >= start_time:
+            logs.append(log)
+    return logs
 
-    return log_lines
+
+def _peak_at_logs(target_user: str, job_name: str, start_time: datetime, seen_logs: List[str]):
+    for log in _read_logs(target_user, job_name, start_time):
+        log_line = f'[{log["pod"]}] {log["datetime"].isoformat()}: {log["message"]}'
+        if log_line in seen_logs:
+            continue
+        # Emit what we have not yet emitted "sad streaming"
+        logger.info(log_line)
+        seen_logs.append(log_line)
 
 
 def run_job(
@@ -114,34 +141,25 @@ def run_job(
         command=generate_command_command(execution_script, run_timeout),
     )
 
-    kubernetes_namespace = f"tool-{target_user}"
-    job_has_been_running = False
     while True:
-        if _job_is_running(target_user, job_name):
-            job_has_been_running = True
-            pod_name = get_pod_name_for_job(kubernetes_namespace, job_name)
-            if is_container_running(kubernetes_namespace, pod_name):
-                logger.info("Container has actually started...")
-                break
-            logger.info("Job is running, but container is not...")
-        else:
-            if job_has_been_running:
-                logger.error("Job is not running, but was previously... likely failed")
-                return False
-            logger.info("Job is not running...")
-        time.sleep(1)
+        start_time = _wait_for_job_to_start(
+            target_user=target_user,
+            job_name=job_name,
+        )
+        if start_time is not None:
+            break
+        time.sleep(0.5)
 
-    logs = []
+    seen_logs = []
     logger.debug("Waiting for job to finish")
     while True:
+        _peak_at_logs(target_user=target_user, job_name=job_name, start_time=start_time, seen_logs=seen_logs)
+
         if not _job_is_running(target_user, job_name):
-            logger.info("Job is no longer running...")
-            for line in logs:
-                logger.info(line)
+            logger.info("Job has stopped running")
             break
 
-        logger.debug("Job is still running, grabbing logs...")
-        logs = _read_logs(target_user=target_user, job_name=job_name)
         time.sleep(1)
 
+    _peak_at_logs(target_user=target_user, job_name=job_name, start_time=start_time, seen_logs=seen_logs)
     return _job_was_successful(target_user, job_name)
