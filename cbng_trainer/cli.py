@@ -24,6 +24,7 @@ SOFTWARE.
 """
 import logging
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import PosixPath
 from typing import Optional, List
@@ -33,7 +34,7 @@ import click
 from cbng_trainer.api import FileApi
 from cbng_trainer.common.files import calculate_target_path
 from cbng_trainer.common.steps import Steps
-from cbng_trainer.common.toolforge import run_job
+from cbng_trainer.common.toolforge import run_job, number_of_running_jobs
 from cbng_trainer.common.utils import (
     get_target_edit_groups,
     get_latest_github_release,
@@ -157,6 +158,7 @@ def run_edit_set(
 @click.option("--print-only/--no-print-only", default=False)
 # These are essentially constants
 @click.option("--toolforge-user", default="cluebotng-trainer", required=True)
+@click.option("--max-jobs", default=7, required=True)
 @click.option(
     "--image-name", default="tools-harbor.wmcloud.org/tool-cluebotng-trainer/backend-service:latest", required=True
 )
@@ -175,6 +177,7 @@ def run_edit_sets(
     review_host: str,
     trainer_host: str,
     release_ref: Optional[str],
+    max_jobs: int,
 ) -> None:
     if not release_ref:
         release_ref = get_latest_github_release("cluebotng", "core")
@@ -232,7 +235,19 @@ def run_edit_sets(
                     )
                 )
 
+    # We get 15 total one-off jobs
+    # Each coord will spawn 1 child at a time, so each job counts for 2
+    # We also need 1 for ourselves so 15 - 1 = 14, 14/2 = 7
     for container_name, script in targets:
+        while True:
+            currently_running_jobs = number_of_running_jobs(toolforge_user)
+            if currently_running_jobs is not None and currently_running_jobs < max_jobs:
+                logger.info(f"Have quota [{currently_running_jobs} vs {max_jobs}]... spawning")
+                break
+
+            logger.info(f"Have no quota [{currently_running_jobs} vs {max_jobs}]... waiting")
+            time.sleep(1)
+
         run_job(
             target_user=toolforge_user,
             job_name=container_name,
