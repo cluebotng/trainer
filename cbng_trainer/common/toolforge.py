@@ -119,7 +119,7 @@ def _peak_at_logs(target_user: str, job_name: str, start_time: datetime, seen_lo
         seen_logs.append(log_line)
 
 
-def number_of_running_jobs(target_user: str) -> Optional[int]:
+def number_of_running_jobs(target_user: str, prefix: Optional[str] = None) -> Optional[int]:
     api = _client_config(target_user)
     try:
         resp = api.get(f"/jobs/v1/tool/{target_user}/jobs/")
@@ -127,7 +127,13 @@ def number_of_running_jobs(target_user: str) -> Optional[int]:
         logger.error(f"Failed to get jobs: [{e.response.status_code}] {e.response.text}")
         return None
 
-    return len([job for job in resp["jobs"] if "Running for " in job["status_short"]])
+    return len(
+        [
+            job
+            for job in resp["jobs"]
+            if "Running for " in job["status_short"] and (prefix is None or job["name"].startswith(prefix))
+        ]
+    )
 
 
 def run_job(

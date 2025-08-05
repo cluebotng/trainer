@@ -240,7 +240,7 @@ def run_edit_sets(
     # We also need 1 for ourselves so 15 - 1 = 14, 14/2 = 7... use 5 since sometimes things get out of sync
     for container_name, script in targets:
         while True:
-            currently_running_jobs = number_of_running_jobs(toolforge_user)
+            currently_running_jobs = number_of_running_jobs(toolforge_user, "coord-")
             if currently_running_jobs is not None and currently_running_jobs < max_jobs:
                 logger.info(f"Have quota [{currently_running_jobs} vs {max_jobs}]... spawning")
                 break
