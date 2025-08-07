@@ -90,21 +90,19 @@ def _read_logs(target_user: str, job_name: str, start_time: datetime) -> List[Di
 
     logs = []
     try:
-        raw_lines = api.get_raw_lines(
+        for raw_line in api.get_raw_lines(
             f"/jobs/v1/tool/{target_user}/jobs/{job_name}/logs/",
             params={"follow": "false"},
             timeout=10,
-        )
+        ):
+            log = json.loads(raw_line)
+            log["datetime"] = datetime.fromisoformat(log["datetime"])
+            if log["datetime"] >= start_time:
+                logs.append(log)
     except HTTPError as e:
         if e.response.status_code == 404:
             return []
         raise e
-
-    for raw_line in raw_lines:
-        log = json.loads(raw_line)
-        log["datetime"] = datetime.fromisoformat(log["datetime"])
-        if log["datetime"] >= start_time:
-            logs.append(log)
     return logs
 
 
