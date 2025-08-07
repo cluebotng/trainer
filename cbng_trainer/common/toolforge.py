@@ -5,7 +5,7 @@ import time
 from datetime import datetime
 from typing import Optional, Dict, List, Any
 
-from requests import HTTPError
+from requests.exceptions import HTTPError
 from toolforge_weld.api_client import ToolforgeClient
 from toolforge_weld.config import load_config
 from toolforge_weld.kubernetes_config import Kubeconfig
@@ -97,7 +97,6 @@ def _read_logs(target_user: str, job_name: str, start_time: datetime) -> List[Di
         )
     except HTTPError as e:
         if e.response.status_code == 404:
-            logger.warning(f"Got 404 when requesting logs for {job_name}")
             return []
         raise e
 
