@@ -1,6 +1,6 @@
 config_version: v1beta1
 components:
-  backend-service:
+  trainer:
     component_type: scheduled
     build:
       repository: https://github.com/cluebotng/trainer.git

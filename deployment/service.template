@@ -1,6 +1,6 @@
 # This is for the webservice
 type: buildservice
-buildservice-image: tool-cluebotng-trainer/backend-service:latest
+buildservice-image: tool-cluebotng-trainer/trainer:latest
 mount: all
 health-check-path: /
 extra_args: ['file-api']

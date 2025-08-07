@@ -18,7 +18,7 @@ Example local execution:
 cbng-trainer run-edit-sets --print-only
 
 INFO:__main__:Using sampled edits as fallback trial group for Report Interface Import
-cbng-trainer run-edit-set --image-name="tools-harbor.wmcloud.org/tool-cluebotng-trainer/backend-service:latest" --target-name="Legacy Report Interface Import" --instance-name="2025-08-03 22:56:16" --release-ref="v1.0.3" --trainer-host="http://cluebotng-trainer.tool-cluebotng-trainer.svc.tools.local:8000" --download-training="http://cluebotng-review.tool-cluebotng-review.svc.tools.local:8000/api/v1/edit-groups/1/dump-editset/" --download-trial="http://cluebotng-review.tool-cluebotng-review.svc.tools.local:8000/api/v1/edit-groups/26/dump-editset/"
+cbng-trainer run-edit-set --image-name="tools-harbor.wmcloud.org/tool-cluebotng-trainer/trainer:latest" --target-name="Legacy Report Interface Import" --instance-name="2025-08-03 22:56:16" --release-ref="v1.0.3" --trainer-host="http://cluebotng-trainer.tool-cluebotng-trainer.svc.tools.local:8000" --download-training="http://cluebotng-review.tool-cluebotng-review.svc.tools.local:8000/api/v1/edit-groups/1/dump-editset/" --download-trial="http://cluebotng-review.tool-cluebotng-review.svc.tools.local:8000/api/v1/edit-groups/26/dump-editset/"
 ```
 
 For each execution (`run-edit-set`), a `job` is made via the toolforge `jobs` framework.
@@ -32,7 +32,7 @@ This does all the heavy lifting for a specific edit group, executing the `steps`
 Example local execution:
 
 ```
-cbng-trainer run-edit-set --image-name="tools-harbor.wmcloud.org/tool-cluebotng-trainer/backend-service:latest" --target-name="Legacy Report Interface Import" --instance-name="2025-08-03 22:56:16" --release-ref="v1.0.3" --trainer-host="http://cluebotng-trainer.tool-cluebotng-trainer.svc.tools.local:8000" --download-training="http://cluebotng-review.tool-cluebotng-review.svc.tools.local:8000/api/v1/edit-groups/1/dump-editset/" --download-trial="http://cluebotng-review.tool-cluebotng-review.svc.tools.local:8000/api/v1/edit-groups/26/dump-editset/"
+cbng-trainer run-edit-set --image-name="tools-harbor.wmcloud.org/tool-cluebotng-trainer/trainer:latest" --target-name="Legacy Report Interface Import" --instance-name="2025-08-03 22:56:16" --release-ref="v1.0.3" --trainer-host="http://cluebotng-trainer.tool-cluebotng-trainer.svc.tools.local:8000" --download-training="http://cluebotng-review.tool-cluebotng-review.svc.tools.local:8000/api/v1/edit-groups/1/dump-editset/" --download-trial="http://cluebotng-review.tool-cluebotng-review.svc.tools.local:8000/api/v1/edit-groups/26/dump-editset/"
 INFO:cbng_trainer.common.toolforge:Starting job legacy-report-interface-import-store-edit-sets
 INFO:cbng_trainer.common.toolforge:Job is running, but container is not...
 INFO:cbng_trainer.common.toolforge:Container has actually started...
