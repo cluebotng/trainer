@@ -4,12 +4,10 @@ permissions:
   deployments: write
   contents: write
 jobs:
-  release:
+  deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger deployment job
-        run: |
-          curl \
-          --fail-with-body \
-          -X POST \
-          'https://api.svc.toolforge.org/components/v1/tool/cluebotng-trainer/deployment?token=${{ secrets.TOOLFORGE_DEPLOY_TOKEN }}'
+      - uses: cluebotng/ci-toolforge-deploy@main
+        with:
+          tool: cluebotng-trainer
+          token: ${{ secrets.TOOLFORGE_DEPLOY_TOKEN }}
