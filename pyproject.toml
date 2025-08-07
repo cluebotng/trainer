@@ -18,6 +18,7 @@ dependencies = [
 tox = "4.24.1"
 tox-current-env = "0.0.14"
 black = "25.1.0"
+ruff = "0.9.7"
 
 [tool.ruff]
 exclude = ['*/migrations/*', 've/*', '.tox/*']
