@@ -35,4 +35,4 @@ jobs:
           docker run \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v $PWD:/workspace -w /workspace \
-            buildpacksio/pack build reviewer --builder heroku/builder:22
+            buildpacksio/pack build --builder tools-harbor.wmcloud.org/toolforge/heroku-builder:22 trainer
