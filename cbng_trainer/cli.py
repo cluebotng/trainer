@@ -207,7 +207,7 @@ def run_edit_sets(
                 continue
 
             script = [
-                "cbng-trainer",
+                "./deployment/entrypoint.sh",
                 "run-edit-set",
                 f'--image-name="{image_name}"',
                 f'--target-name="{target_name}"',
