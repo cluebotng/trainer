@@ -5,3 +5,9 @@ schema-version = "0.2"
 install = [
     "gnuplot",
 ]
+
+[[com.heroku.buildpacks.deb-packages.sources]]
+uri = "http://ports.ubuntu.com/ubuntu-ports"
+suites = ["noble"]
+components = ["universe"]
+arch = ["arm64"]
