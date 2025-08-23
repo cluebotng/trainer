@@ -1,13 +1,21 @@
 name: Release
-on: { push: { branch: [ 'main' ] } }
+on: { push: { tags: [ 'v*' ] } }
 permissions:
   deployments: write
   contents: write
 jobs:
-  deploy:
+  release:
     runs-on: ubuntu-latest
     steps:
-      - uses: cluebotng/ci-toolforge-deploy@main
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Package the source
+        run: |
+          tar -cvf trainer.tar.gz *
+
+      - name: Crease a release
+        uses: ncipollo/release-action@v1
         with:
-          tool: cluebotng-trainer
-          token: ${{ secrets.TOOLFORGE_DEPLOY_TOKEN }}
+          token: "${{ secrets.GITHUB_TOKEN }}"
+          artifacts: "trainer.tar.gz"
