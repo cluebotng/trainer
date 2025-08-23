@@ -31,8 +31,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build container
         run: |
-          # Note: we use the old build pack as we use the deployment api which doesn't support the latest
           docker run \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v $PWD:/workspace -w /workspace \
-            buildpacksio/pack build --builder tools-harbor.wmcloud.org/toolforge/heroku-builder:22 trainer
+            buildpacksio/pack build trainer --builder heroku/builder:24
