@@ -146,6 +146,7 @@ def run_job(
     skip_binary_setup: bool = False,
     wait_for_completion: bool = True,
     run_timeout: str = "2h",
+    start_timeout: int = 60,
 ):
     execution_script = generate_execution_script(
         release_ref,
@@ -167,13 +168,20 @@ def run_job(
     if not wait_for_completion:
         return True
 
+    waiting_start_time = time.time()
     while True:
         start_time = _wait_for_job_to_start(
             target_user=target_user,
             job_name=job_name,
         )
+
         if start_time is not None:
             break
+
+        if waiting_start_time + start_timeout < time.time():
+            logger.error(f'{job_name} timed out waiting to start')
+            return False
+
         time.sleep(0.5)
 
     seen_logs = []
