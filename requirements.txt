@@ -1,4 +1,0 @@
-# https://wikitech.wikimedia.org/wiki/Help:Toolforge/Deploy_your_tool#Creating_a_deployment
-# does not support the latest build packs, which support poetry.
-# Mirror the requirements here for now, so we can build:
-.

@@ -28,27 +28,12 @@ def _push_file_to_remote(source: str, target: Optional[str] = None):
 
 
 @task()
-def deploy(_ctx):
-    """Deploy the production configs."""
+def deploy_webservice(_ctx):
+    """Deploy the webservice."""
     _push_file_to_remote("service.template")
-    _push_file_to_remote("toolforge.yaml")
-
-    # Load the components config
-    c.sudo(
-        f"XDG_CONFIG_HOME={TOOL_DIR} toolforge "
-        f"components config create {TOOL_DIR / 'toolforge.yaml'}"
-    )
 
     # Start the webservice (service files out of public_html)
     c.sudo(f"XDG_CONFIG_HOME={TOOL_DIR} toolforge webservice buildservice restart")
-
-
-@task
-def build(_ctx):
-    # Build
-    c.sudo(
-        f"XDG_CONFIG_HOME={TOOL_DIR} toolforge components deployment create"
-    )
 
 
 @task
