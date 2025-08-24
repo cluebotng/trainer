@@ -47,7 +47,9 @@ class FileApi:
             target_path.parent.mkdir(parents=True)
 
         if target_path.is_file():
-            return Response(status=403)
+            # File already exists, don't overwrite it
+            # Return 200 to make the client not treat this as a failure, assume the content is the same
+            return Response(status=200)
 
         with target_path.open("wb") as fh:
             fh.write(request.get_data())
@@ -137,7 +139,10 @@ class FileApi:
             return self._render_listing(target_path)
 
         if target_path.is_file():
-            return send_file(target_path.as_posix())
+            return send_file(
+                target_path.as_posix(),
+                "text/plain" if target_path.as_posix().endswith("*.log") else None,
+            )
 
         return Response(status=404)
 
