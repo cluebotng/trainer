@@ -21,3 +21,5 @@ set ylabel 'Detection Rate'
 
 plot 'thresholdtable.txt' using 1:2 title 'Correct Positive %' with lines, 'thresholdtable.txt' using 1:3 title 'False Positive %' with lines
 """  #  noqa
+
+JOB_LOGS_END_MARKER = "## JOB FINISHED MARKER ##"

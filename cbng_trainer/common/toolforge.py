@@ -2,14 +2,15 @@ import json
 import logging
 import re
 import time
-from datetime import datetime
-from typing import Optional, Dict, List, Any
+from datetime import datetime, timedelta, UTC
+from typing import Optional, Dict, List, Any, Tuple, Union
 
 from requests.exceptions import HTTPError
 from toolforge_weld.api_client import ToolforgeClient
 from toolforge_weld.config import load_config
 from toolforge_weld.kubernetes_config import Kubeconfig
 
+from cbng_trainer.common.consts import JOB_LOGS_END_MARKER
 from cbng_trainer.common.utils import generate_execution_script, generate_command_command
 
 logger = logging.getLogger(__name__)
@@ -30,7 +31,6 @@ def _run_job(
     image: str,
     command: str,
 ):
-    logger.info(f"Starting job {job_name}")
     api = _client_config(target_user)
     try:
         api.post(
@@ -46,6 +46,14 @@ def _run_job(
         raise Exception(f"Failed to create {job_name}: [{e.response.status_code}] {e.response.text}")
 
 
+def _delete_job(target_user: str, name: str):
+    api = _client_config(target_user)
+    try:
+        api.delete(f"/jobs/v1/tool/{target_user}/jobs/{name}/")
+    except HTTPError as e:
+        logger.warning(f"Failed to delete {name}: [{e.response.status_code}] {e.response.text}")
+
+
 def _job_was_successful(target_user: str, name: str) -> bool:
     api = _client_config(target_user)
     try:
@@ -53,7 +61,6 @@ def _job_was_successful(target_user: str, name: str) -> bool:
     except HTTPError as e:
         logger.error(f"Failed to get {name}: [{e.response.status_code}] {e.response.text}")
         return False
-
     return resp["job"]["status_short"] == "Completed" and "Exit code '0'" in resp["job"]["status_long"]
 
 
@@ -70,7 +77,7 @@ def _job_is_running(target_user: str, name: str) -> bool:
     return "Running for " in resp["job"]["status_short"]
 
 
-def _wait_for_job_to_start(target_user: str, job_name: str) -> Optional[datetime]:
+def _wait_for_job_to_start(target_user: str, job_name: str) -> Optional[Union[datetime, bool]]:
     api = _client_config(target_user)
     try:
         resp = api.get(f"/jobs/v1/tool/{target_user}/jobs/{job_name}/")
@@ -79,6 +86,9 @@ def _wait_for_job_to_start(target_user: str, job_name: str) -> Optional[datetime
             return None
         logger.error(f"Failed to get {job_name}: [{e.response.status_code}] {e.response.text}")
         return None
+
+    if resp["job"]["status_short"] == "Failed":
+        return False
 
     if match := re.match(r"^Last run at (.+)\. Pod in 'Running' phase\.", resp["job"]["status_long"]):
         return datetime.fromisoformat(match.group(1))
@@ -116,6 +126,25 @@ def _peak_at_logs(target_user: str, job_name: str, start_time: datetime, seen_lo
         seen_logs.append(log_line)
 
 
+def _wait_for_logs_end_marker(
+    target_user: str, job_name: str, start_time: datetime, seen_logs: List[str], timeout: int = 120
+):
+    waiting_start_time = time.time()
+    while True:
+        _peak_at_logs(target_user, job_name, start_time, seen_logs)
+
+        for line in seen_logs:
+            if line.strip().endswith(f": {JOB_LOGS_END_MARKER}"):
+                logger.info(f"[{job_name}] Found log end marker")
+                return
+
+        if waiting_start_time + timeout < time.time():
+            logger.error(f"[{job_name}] Timed out before log end marker")
+            return
+
+        time.sleep(1)
+
+
 def number_of_running_jobs(target_user: str, prefix: Optional[str] = None) -> Optional[int]:
     api = _client_config(target_user)
     try:
@@ -147,7 +176,7 @@ def run_job(
     wait_for_completion: bool = True,
     run_timeout: str = "2h",
     start_timeout: int = 60,
-):
+) -> bool:
     execution_script = generate_execution_script(
         release_ref,
         download_bins_url,
@@ -158,6 +187,7 @@ def run_job(
         run_commands,
     )
 
+    logger.info(f"[{job_name}] Creating job")
     _run_job(
         target_user=target_user,
         job_name=job_name,
@@ -168,7 +198,8 @@ def run_job(
     if not wait_for_completion:
         return True
 
-    waiting_start_time = time.time()
+    logger.info(f"[{job_name}] Waiting for job to start")
+    waiting_start_time = datetime.now(tz=UTC)
     while True:
         start_time = _wait_for_job_to_start(
             target_user=target_user,
@@ -178,22 +209,36 @@ def run_job(
         if start_time is not None:
             break
 
-        if waiting_start_time + start_timeout < time.time():
-            logger.error(f'{job_name} timed out waiting to start')
+        if waiting_start_time + timedelta(seconds=start_timeout) < datetime.now(tz=UTC):
+            logger.error(f"[{job_name}] Job failed to start within timeout")
             return False
 
         time.sleep(0.5)
 
     seen_logs = []
-    logger.debug("Waiting for job to finish")
+    if start_time is False:
+        logger.info(f"[{job_name}] Job failed to start")
+        _wait_for_logs_end_marker(
+            target_user=target_user, job_name=job_name, start_time=waiting_start_time, seen_logs=seen_logs
+        )
+        _delete_job(target_user, job_name)
+        return False
+
+    logger.info(f"[{job_name}] Job started, waiting for job to finish")
     while True:
         _peak_at_logs(target_user=target_user, job_name=job_name, start_time=start_time, seen_logs=seen_logs)
 
         if not _job_is_running(target_user, job_name):
-            logger.info("Job has stopped running")
+            logger.info(f"[{job_name}] Job is not running")
             break
 
         time.sleep(1)
 
-    _peak_at_logs(target_user=target_user, job_name=job_name, start_time=start_time, seen_logs=seen_logs)
-    return _job_was_successful(target_user, job_name)
+    success = _job_was_successful(target_user, job_name)
+    logger.info(f"[{job_name}] Job {'succeeded' if success else 'failed'}")
+
+    _wait_for_logs_end_marker(
+        target_user=target_user, job_name=job_name, start_time=waiting_start_time, seen_logs=seen_logs
+    )
+    _delete_job(target_user, job_name)
+    return success

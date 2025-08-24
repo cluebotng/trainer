@@ -29,6 +29,8 @@ from typing import Dict, List, Optional
 
 import requests
 
+from cbng_trainer.common.consts import JOB_LOGS_END_MARKER
+
 
 def get_latest_github_release(org: str, repo: str):
     r = requests.get(f"https://api.github.com/repos/{org}/{repo}/releases/latest")
@@ -70,6 +72,8 @@ def generate_execution_script(
     setup_script += 'echo -e "Authorization:Bearer ${CBNG_TRAINER_FILE_API_KEY}" > /tmp/file-api-headers\n'
     # Expose everything else
     setup_script += "set -xe\n"
+    # Emit a know message on exit, so we can parse the logs later
+    setup_script += f"trap \"echo '{JOB_LOGS_END_MARKER}'\" EXIT\n"
 
     # Helper functions
     setup_script += """
@@ -80,7 +84,14 @@ def generate_execution_script(
         target_url=$2
         if [ -s "${source_path}" ];
         then
-            curl --fail -H@/tmp/file-api-headers --data-binary "@${source_path}" "${target_url}"
+            curl \
+                --fail \
+                --connect-timeout 5 \
+                --max-time 60 \
+                --retry 5 \
+                -H@/tmp/file-api-headers \
+                --data-binary "@${source_path}" \
+                "${target_url}"
         else
             echo "Not upload ${source_path} - source is empty"
         fi
