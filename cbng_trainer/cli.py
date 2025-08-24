@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 
 @click.group()
 def cli() -> None:
-    logging.basicConfig(level=logging.INFO, stream=sys.stderr)
+    logging.basicConfig(level=logging.INFO, stream=sys.stderr, format="%(asctime)s [%(levelname)s] %(message)s")
 
 
 # "Job runner" - spawns kubernetes pods to run through our steps
@@ -76,6 +76,7 @@ def run_edit_set(
         target_name=target_name,
         image_name=image_name,
         release_ref=release_ref,
+        upload_logs=calculate_target_path(trainer_host, target_name, instance_name, "logs"),
     )
 
     # Download the files
@@ -249,7 +250,7 @@ def run_edit_sets(
                 logger.info(f"Have no quota [{currently_running_jobs} vs {max_jobs}]... waiting")
                 time.sleep(1)
 
-        run_job(
+        success, _ = run_job(
             target_user=toolforge_user,
             job_name=container_name,
             image_name=image_name,
@@ -257,6 +258,8 @@ def run_edit_sets(
             run_commands=[script],
             wait_for_completion=(max_jobs == 1),
         )
+        if not success:
+            logger.warning(f"Job failed for {container_name}")
 
 
 @cli.command()

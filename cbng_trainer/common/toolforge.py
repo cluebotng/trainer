@@ -118,7 +118,7 @@ def _read_logs(target_user: str, job_name: str, start_time: datetime) -> List[Di
 
 def _peak_at_logs(target_user: str, job_name: str, start_time: datetime, seen_logs: List[str]):
     for log in _read_logs(target_user, job_name, start_time):
-        log_line = f'[{log["pod"]}] {log["datetime"].isoformat()}: {log["message"]}'
+        log_line = f'{log["datetime"].isoformat()}: {log["message"]}'
         if log_line in seen_logs:
             continue
         # Emit what we have not yet emitted "sad streaming"
@@ -176,7 +176,7 @@ def run_job(
     wait_for_completion: bool = True,
     run_timeout: str = "2h",
     start_timeout: int = 60,
-) -> bool:
+) -> Tuple[bool, List[str]]:
     execution_script = generate_execution_script(
         release_ref,
         download_bins_url,
@@ -196,7 +196,7 @@ def run_job(
     )
 
     if not wait_for_completion:
-        return True
+        return True, []
 
     logger.info(f"[{job_name}] Waiting for job to start")
     waiting_start_time = datetime.now(tz=UTC)
@@ -211,7 +211,7 @@ def run_job(
 
         if waiting_start_time + timedelta(seconds=start_timeout) < datetime.now(tz=UTC):
             logger.error(f"[{job_name}] Job failed to start within timeout")
-            return False
+            return False, []
 
         time.sleep(0.5)
 
@@ -222,7 +222,7 @@ def run_job(
             target_user=target_user, job_name=job_name, start_time=waiting_start_time, seen_logs=seen_logs
         )
         _delete_job(target_user, job_name)
-        return False
+        return False, seen_logs
 
     logger.info(f"[{job_name}] Job started, waiting for job to finish")
     while True:
@@ -241,4 +241,4 @@ def run_job(
         target_user=target_user, job_name=job_name, start_time=waiting_start_time, seen_logs=seen_logs
     )
     _delete_job(target_user, job_name)
-    return success
+    return success, seen_logs
