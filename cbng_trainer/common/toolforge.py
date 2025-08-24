@@ -175,7 +175,7 @@ def run_job(
     skip_binary_setup: bool = False,
     wait_for_completion: bool = True,
     run_timeout: str = "2h",
-    start_timeout: int = 60,
+    start_timeout: int = 300,
     wait_for_job_logs_marker: bool = True,
 ) -> Tuple[bool, List[str]]:
     execution_script = generate_execution_script(
