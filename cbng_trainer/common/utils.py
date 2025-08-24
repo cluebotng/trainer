@@ -92,6 +92,7 @@ def generate_execution_script(
                 --connect-timeout 5 \
                 --max-time 60 \
                 --retry 5 \
+                -s \
                 -H@/tmp/file-api-headers \
                 --data-binary "@${source_path}" \
                 "${target_url}"
