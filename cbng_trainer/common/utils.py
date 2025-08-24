@@ -70,10 +70,10 @@ def generate_execution_script(
     setup_script = "#!/bin/bash\n"
     # Don't expose the secret
     setup_script += 'echo -e "Authorization:Bearer ${CBNG_TRAINER_FILE_API_KEY}" > /tmp/file-api-headers\n'
-    # Expose everything else
-    setup_script += "set -xe\n"
     # Emit a know message on exit, so we can parse the logs later
     setup_script += f"trap \"echo '{JOB_LOGS_END_MARKER}'\" EXIT\n"
+    # Expose everything else
+    setup_script += "set -xe\n"
 
     # Helper functions
     setup_script += """
