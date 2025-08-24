@@ -111,13 +111,13 @@ def generate_execution_script(
         for bin in cluebotng create_ann create_bayes_db print_bayes_db;
         do
             echo "Downloading https://github.com/cluebotng/core/releases/download/{release_ref}/$bin -> /tmp/cbng-core/$bin"
-            curl --fail -s -L --output /tmp/cbng-core/$bin https://github.com/cluebotng/core/releases/download/{release_ref}/$bin
+            curl --fail -s --connect-timeout 5 --max-time 60 --retry 5 -L --output /tmp/cbng-core/$bin https://github.com/cluebotng/core/releases/download/{release_ref}/$bin
             chmod 755 /tmp/cbng-core/$bin
         done
 
         # Config we need to run
         echo "Downloading config from https://github.com/cluebotng/core/releases/download/{release_ref}/conf.tar.gz"
-        curl --fail -s -L --output /tmp/conf.tar.gz https://github.com/cluebotng/core/releases/download/{release_ref}/conf.tar.gz
+        curl --fail -s --connect-timeout 5 --max-time 60 --retry 5 -L --output /tmp/conf.tar.gz https://github.com/cluebotng/core/releases/download/{release_ref}/conf.tar.gz
         tar -C /tmp/cbng-core/ -xf /tmp/conf.tar.gz
 
         # Hack to not require a tty
@@ -149,13 +149,13 @@ def generate_execution_script(
         files_to_download[name] = url
 
     if files_to_download:
-        setup_script += '# Ensure the target directories exist\n'
+        setup_script += "# Ensure the target directories exist\n"
         for path in set([PosixPath(path).parent for path in files_to_download if PosixPath(path).parent != "."]):
             setup_script += f"mkdir -p '/tmp/cbng-core/{path}'\n"
 
         for path, url in files_to_download.items():
             setup_script += f'echo "Downloading {url} -> /tmp/cbng-core/{path}"\n'
-            setup_script += f"curl --fail -s -L --output '/tmp/cbng-core/{path}' '{url}'\n"
+            setup_script += f"curl --fail -s --connect-timeout 5 --max-time 60 --retry 5 -L --output '/tmp/cbng-core/{path}' '{url}'\n"
 
     if run_commands:
         setup_script += 'echo "Executing commands"\n'
