@@ -141,7 +141,7 @@ class FileApi:
         if target_path.is_file():
             return send_file(
                 target_path.as_posix(),
-                "text/plain" if target_path.as_posix().endswith("*.log") else None,
+                "text/plain" if target_path.as_posix().endswith(".log") else None,
             )
 
         return Response(status=404)
