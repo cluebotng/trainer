@@ -68,12 +68,13 @@ def generate_execution_script(
     run_commands: Optional[List[str]] = None,
 ) -> str:
     setup_script = "#!/bin/bash\n"
-    # Don't expose the secret
+    setup_script += "set -e\n"
+
+    # Stash the secret so we don't expose it
     setup_script += 'echo -e "Authorization:Bearer ${CBNG_TRAINER_FILE_API_KEY}" > /tmp/file-api-headers\n'
+
     # Emit a know message on exit, so we can parse the logs later
     setup_script += f"trap \"echo '{JOB_LOGS_END_MARKER}'\" EXIT\n"
-    # Expose everything else
-    setup_script += "set -xe\n"
 
     # Helper functions
     setup_script += """
@@ -84,6 +85,8 @@ def generate_execution_script(
         target_url=$2
         if [ -s "${source_path}" ];
         then
+            echo "Uploading ${source_path} to ${target_url}"
+
             curl \
                 --fail \
                 --connect-timeout 5 \
@@ -93,7 +96,7 @@ def generate_execution_script(
                 --data-binary "@${source_path}" \
                 "${target_url}"
         else
-            echo "Not upload ${source_path} - source is empty"
+            echo "Skipping upload of ${source_path} to ${target_url}"
         fi
     }
     """
@@ -106,15 +109,18 @@ def generate_execution_script(
         # Binaries we need to run
         for bin in cluebotng create_ann create_bayes_db print_bayes_db;
         do
+            echo "Downloading https://github.com/cluebotng/core/releases/download/{release_ref}/$bin -> /tmp/cbng-core/$bin"
             curl --fail -s -L --output /tmp/cbng-core/$bin https://github.com/cluebotng/core/releases/download/{release_ref}/$bin
             chmod 755 /tmp/cbng-core/$bin
         done
 
         # Config we need to run
+        echo "Downloading config from https://github.com/cluebotng/core/releases/download/{release_ref}/conf.tar.gz"
         curl --fail -s -L --output /tmp/conf.tar.gz https://github.com/cluebotng/core/releases/download/{release_ref}/conf.tar.gz
-        tar -C /tmp/cbng-core/ -xvf /tmp/conf.tar.gz
+        tar -C /tmp/cbng-core/ -xf /tmp/conf.tar.gz
 
         # Hack to not require a tty
+        echo "Patching config to remove train_outputs (print_progress)"
         sed -i s'/, "train_outputs"//g' /tmp/cbng-core/conf/cluebotng.conf
         """
 
@@ -142,21 +148,20 @@ def generate_execution_script(
         files_to_download[name] = url
 
     if files_to_download:
-        setup_script += "# Ensure target directories exist\n"
+        setup_script += '# Ensure the target directories exist\n'
         for path in set([PosixPath(path).parent for path in files_to_download if PosixPath(path).parent != "."]):
             setup_script += f"mkdir -p '/tmp/cbng-core/{path}'\n"
 
-        setup_script += "# Download files\n"
         for path, url in files_to_download.items():
+            setup_script += f'echo "Downloading {url} -> /tmp/cbng-core/{path}"\n'
             setup_script += f"curl --fail -s -L --output '/tmp/cbng-core/{path}' '{url}'\n"
 
     if run_commands:
-        setup_script += "# Commands\n"
+        setup_script += 'echo "Executing commands"\n'
         for command in run_commands:
             setup_script += f"{command}\n"
     else:
-        setup_script += "# Wait for interaction\n"
-        setup_script += "touch /tmp/container_ready\n"
+        setup_script += 'echo "Waiting for interactive usage"\n'
         setup_script += "sleep infinity\n"
     return setup_script
 

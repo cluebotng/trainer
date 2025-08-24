@@ -229,7 +229,6 @@ def run_job(
         _peak_at_logs(target_user=target_user, job_name=job_name, start_time=start_time, seen_logs=seen_logs)
 
         if not _job_is_running(target_user, job_name):
-            logger.info(f"[{job_name}] Job is not running")
             break
 
         time.sleep(1)

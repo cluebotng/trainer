@@ -94,8 +94,13 @@ class Steps:
         commands = []
         for download_url, upload_url in mapping.items():
             temp_path = f"/tmp/{uuid.uuid4().hex}"
-            commands.append(f"curl --fail --progress-bar -sL --output '{temp_path}' '{download_url}'")
-            commands.append(f'upload_file "{temp_path}" "{upload_url}"')
+            commands.extend(
+                [
+                    f"echo \"Downloading '{download_url}' to '{temp_path}'\"",
+                    f"curl --fail --progress-bar -sL --output '{temp_path}' '{download_url}'",
+                    f'upload_file "{temp_path}" "{upload_url}"',
+                ]
+            )
 
         success, logs = run_job(
             target_user=self.toolforge_user,
@@ -120,6 +125,7 @@ class Steps:
             download_edit_set_url=download_edit_set_url,
             skip_binary_setup=True,
             run_commands=[
+                'echo "Executing bayes_train"',
                 "cd /tmp/cbng-core && mkdir data/ && ./cluebotng -c conf -m bayes_train -f edits.xml",
                 f'upload_file "data/main_bayes_train.dat" "{upload_files_url}/main_bayes_train.dat"',
                 f'upload_file "data/two_bayes_train.dat" "{upload_files_url}/two_bayes_train.dat"',
@@ -145,6 +151,7 @@ class Steps:
                 "data/main_bayes_train.dat": f"{upload_files_url}/main_bayes_train.dat",
             },
             run_commands=[
+                'echo "Executing create_bayes_db"',
                 "cd /tmp/cbng-core && ./create_bayes_db data/bayes.db data/main_bayes_train.dat",
                 f'upload_file "data/bayes.db" "{upload_files_url}/bayes.db"',
             ],
@@ -169,6 +176,7 @@ class Steps:
                 "data/two_bayes_train.dat": f"{upload_files_url}/two_bayes_train.dat",
             },
             run_commands=[
+                'echo "Executing create_bayes_db"',
                 "cd /tmp/cbng-core && ./create_bayes_db data/two_bayes.db data/two_bayes_train.dat",
                 f'upload_file "data/two_bayes.db" "{upload_files_url}/two_bayes.db"',
             ],
@@ -194,6 +202,7 @@ class Steps:
                 "data/two_bayes.db": f"{upload_files_url}/two_bayes.db",
             },
             run_commands=[
+                'echo "Executing ann_train"',
                 "cd /tmp/cbng-core && ./cluebotng -c conf -m ann_train -f edits.xml",
                 f'upload_file "data/main_ann_train.dat" "{upload_files_url}/main_ann_train.dat"',
             ],
@@ -218,6 +227,7 @@ class Steps:
                 "data/main_ann_train.dat": f"{upload_files_url}/main_ann_train.dat",
             },
             run_commands=[
+                'echo "Executing create_ann"',
                 "cd /tmp/cbng-core && ./create_ann data/main_ann.fann data/main_ann_train.dat 150 0.037 100",
                 f'upload_file "data/main_ann.fann" "{upload_files_url}/main_ann.fann"',
             ],
@@ -231,6 +241,20 @@ class Steps:
         download_bins_url: str,
         upload_report_url: str,
     ) -> bool:
+        run_commands = [
+            'echo "Executing trial_run"',
+            "cd /tmp/cbng-core && mkdir trialreport/ && ./cluebotng -c conf -m trial_run -f edits.xml",
+        ]
+        for file_name in [
+            "debug.xml",
+            "details.txt",
+            "falsenegatives.txt",
+            "falsepositives.txt",
+            "report.txt",
+            "thresholdtable.txt",
+        ]:
+            run_commands.append(f'upload_file "trialreport/{file_name}" "{upload_report_url}/{file_name}"')
+
         success, logs = run_job(
             target_user=self.toolforge_user,
             job_name=clean_job_name(self.target_name, postfix="trial-report"),
@@ -238,20 +262,7 @@ class Steps:
             release_ref=self.release_ref,
             download_bins_url=download_bins_url,
             download_edit_set_url=download_edit_set_url,
-            run_commands=[
-                "cd /tmp/cbng-core && mkdir trialreport/ && ./cluebotng -c conf -m trial_run -f edits.xml",
-            ]
-            + [
-                f'upload_file "trialreport/{file_name}" "{upload_report_url}/{file_name}"'
-                for file_name in [
-                    "debug.xml",
-                    "details.txt",
-                    "falsenegatives.txt",
-                    "falsepositives.txt",
-                    "report.txt",
-                    "thresholdtable.txt",
-                ]
-            ],
+            run_commands=run_commands,
         )
         self._upload_logs("trial-report", logs)
         return success
@@ -267,6 +278,7 @@ class Steps:
                     "cd /tmp/cbng-core/trialreport",
                     "set +e",
                     f'base64 -d <<<{base64.b64encode(plot.encode("utf-8")).decode("utf-8")} > {name}.gnuplot',
+                    f'echo "Generating plot for {name}"',
                     f"gnuplot-qt {name}.gnuplot",
                     (
                         f'if [ -s "{name}.gnuplot" ] && [ -s "{name}.png" ]; then'
