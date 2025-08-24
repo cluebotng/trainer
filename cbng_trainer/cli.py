@@ -257,7 +257,7 @@ def run_edit_sets(
             skip_setup=True,
             run_commands=[script],
             wait_for_completion=(max_jobs == 1),
-            wait_for_job_marker=False,
+            wait_for_job_logs_marker=False,
         )
         if not success:
             logger.warning(f"Job failed for {container_name}")

@@ -176,7 +176,7 @@ def run_job(
     wait_for_completion: bool = True,
     run_timeout: str = "2h",
     start_timeout: int = 60,
-    wait_for_job_marker: bool = True,
+    wait_for_job_logs_marker: bool = True,
 ) -> Tuple[bool, List[str]]:
     execution_script = generate_execution_script(
         release_ref,
@@ -237,7 +237,7 @@ def run_job(
     success = _job_was_successful(target_user, job_name)
     logger.info(f"[{job_name}] Job {'succeeded' if success else 'failed'}")
 
-    if wait_for_job_marker:
+    if wait_for_job_logs_marker:
         # If we are a step, then we wait for the explicit end marker
         _wait_for_logs_end_marker(
             target_user=target_user, job_name=job_name, start_time=waiting_start_time, seen_logs=seen_logs
