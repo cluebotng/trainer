@@ -127,7 +127,7 @@ def _peak_at_logs(target_user: str, job_name: str, start_time: datetime, seen_lo
 
 
 def _wait_for_logs_end_marker(
-    target_user: str, job_name: str, start_time: datetime, seen_logs: List[str], timeout: int = 120
+    target_user: str, job_name: str, start_time: datetime, seen_logs: List[str], timeout: int = 300
 ):
     waiting_start_time = time.time()
     while True:
