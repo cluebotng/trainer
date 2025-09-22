@@ -1,17 +1,12 @@
 name: Deploy
 on: { push: { tags: [ 'v*' ] } }
 jobs:
-  deploy:
+  update-components:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          repository: cluebotng/utilities
-          ref: main
-
       - uses: cluebotng/ci-update-component-ref@main
         with:
-          tool: cluebotng-trainer
-          component: trainer
-          ref: ${{ github.ref }}
-          gh_app_key: ${{ secrets.CI_COMPONENT_CONFIGS_APP_KEY }}
+          tool: 'cluebotng-trainer'
+          component: 'coordinator'
+          ref: '${{ github.ref }}'
+          gh_app_key: '${{ secrets.CI_COMPONENT_CONFIGS_APP_KEY }}'

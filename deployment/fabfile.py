@@ -15,27 +15,6 @@ c = Connection(
 )
 
 
-def _push_file_to_remote(source: str, target: Optional[str] = None):
-    source_path = (PosixPath(__file__).parent / source)
-    target_path = PosixPath(TOOL_DIR / (target if target else source))
-
-    with source_path.open("r") as fh:
-        file_contents = fh.read()
-
-    print(f'Uploading {source_path.as_posix()} -> {target_path.as_posix()}')
-    encoded_contents = base64.b64encode(file_contents.encode("utf-8")).decode("utf-8")
-    c.sudo(f"bash -c \"base64 -d <<< '{encoded_contents}' > '{target_path.as_posix()}'\"")
-
-
-@task()
-def deploy_webservice(_ctx):
-    """Deploy the webservice."""
-    _push_file_to_remote("service.template")
-
-    # Start the webservice (service files out of public_html)
-    c.sudo(f"XDG_CONFIG_HOME={TOOL_DIR} toolforge webservice buildservice restart")
-
-
 @task
 def setup_secrets(_ctx):
     # Copy the kubernetes config into envvars
