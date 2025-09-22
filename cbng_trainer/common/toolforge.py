@@ -103,7 +103,7 @@ def _read_logs(target_user: str, job_name: str, start_time: datetime) -> List[Di
         for raw_line in api.get_raw_lines(
             f"/jobs/v1/tool/{target_user}/jobs/{job_name}/logs/",
             params={"follow": "false"},
-            timeout=10,
+            timeout=30,
         ):
             log = json.loads(raw_line)
             log["datetime"] = datetime.fromisoformat(log["datetime"])
