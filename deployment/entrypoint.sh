@@ -1,15 +1,24 @@
 #!/bin/bash
 
-# Generate a minimal k8s config from envvars
-# This avoids needing to mount nfs to get access to the normal tool account
-if [ ! -f "$HOME/.kube/config" ];
+if [ "${HOME}" == "/" ] && [ ! -z "${TOOL_DATA_DIR}"];
 then
-  mkdir -p /workspace/.kube
+    export HOME="${TOOL_DATA_DIR}"
+fi
 
-  echo "$K8S_CLIENT_CRT" > /workspace/.kube/client.crt
-  echo "$K8S_CLIENT_KEY" > /workspace/.kube/client.key
+if [ -f "${HOME}/.kube/config" ];
+then
+    export KUBECONFIG="${HOME}/.kube/config"
+else
+    # Generate a minimal k8s config from envvars
+    # This avoids needing to mount nfs to get access to the normal tool account
+    if [ ! -z "${K8S_CLIENT_CRT}" ] && [ ! -z "${K8S_CLIENT_KEY}" ] && [ ! -z "${K8S_SERVER}" ];
+    then
+        mkdir -p /workspace/.kube
 
-  cat > /workspace/.kube/config <<EOF
+        echo "${K8S_CLIENT_CRT}" > /workspace/.kube/client.crt
+        echo "${K8S_CLIENT_KEY}" > /workspace/.kube/client.key
+
+        cat > /workspace/.kube/config <<EOF
 apiVersion: v1
 clusters:
 - cluster:
@@ -31,7 +40,8 @@ users:
     client-key: /workspace/.kube/client.key
 EOF
 
-  export KUBECONFIG="/workspace/.kube/config"
+    export KUBECONFIG="/workspace/.kube/config"
+    fi
 fi
 
 exec python -m cbng_trainer.cli "$@"
