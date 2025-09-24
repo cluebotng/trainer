@@ -160,7 +160,7 @@ def run_edit_set(
 @click.option("--max-jobs", default=1, required=True)
 @click.option("--image-name", default="tools-harbor.wmcloud.org/tool-cluebotng-trainer/trainer:latest", required=True)
 @click.option(
-    "--review-host", default="http://cluebotng-review.tool-cluebotng-review.svc.tools.local:8000", required=True
+    "--review-host", default="http://cluebotng-reviewer.tool-cluebotng-review.svc.tools.local:8000", required=True
 )
 @click.option(
     "--trainer-host", default="http://cluebotng-trainer.tool-cluebotng-trainer.svc.tools.local:8000", required=True
