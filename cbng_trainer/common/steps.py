@@ -51,7 +51,7 @@ class Steps:
         self.image_name = image_name
         self.release_ref = release_ref
         self.upload_logs = upload_logs
-        self._file_api_key = os.environ.get("CBNG_TRAINER_FILE_API_KEY", "")
+        self._file_api_key = os.environ.get("FILE_API_KEY", "")
 
     def _clean_log_lines(self, logs: List[str]) -> List[str]:
         clean_lines = []
