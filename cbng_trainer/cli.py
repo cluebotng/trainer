@@ -26,12 +26,10 @@ import logging
 import sys
 import time
 from datetime import datetime, timezone
-from pathlib import PosixPath
 from typing import Optional, List
 
 import click
 
-from cbng_trainer.api import FileApi
 from cbng_trainer.common.files import calculate_target_path
 from cbng_trainer.common.steps import Steps
 from cbng_trainer.common.toolforge import run_job, number_of_running_jobs
@@ -262,13 +260,6 @@ def run_edit_sets(
         )
         if not success:
             logger.warning(f"Job failed for {container_name}")
-
-
-@cli.command()
-@click.option("--base-dir", type=click.Path(), default="/data/project/cluebotng-trainer/public_html")
-def run_file_api(base_dir: str) -> None:
-    file_api = FileApi(PosixPath(base_dir))
-    file_api.run()
 
 
 if __name__ == "__main__":

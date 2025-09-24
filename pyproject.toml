@@ -10,7 +10,6 @@ dependencies = [
     "aiohttp",
     "aiohttp-retry",
     "toolforge_weld",
-    "flask",
     "gunicorn",
 ]
 

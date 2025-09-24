@@ -26,12 +26,11 @@ import base64
 import logging
 import os
 import uuid
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import requests
 
 from cbng_trainer.common.consts import THREASHOLDS_PLOT, FALSE_POSITIVES_PLOT, JOB_LOGS_END_MARKER
-from cbng_trainer.common.files import calculate_target_path
 from cbng_trainer.common.toolforge import run_job
 from cbng_trainer.common.utils import clean_job_name
 

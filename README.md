@@ -57,19 +57,6 @@ For each step, a `job` is made via the toolforge `jobs` framework.
 
 _Note: this requires having access to the `jobs` & kubernetes API from your local environment_
 
-### `run-file-api`
-
-Given our purpose in life is to deal with files, we need to access disk... however we don't really want to run on the NFS nodes as they are regularly oversubscribed.
-
-The web api provides 2 services:
-
-1. Read only access (to `public_html`) for humans and tooling
-2. Write access (to `public_html`) for tooling
-
-Essentially at container launch we pull files down from the api and at the end we push files up to the api.
-
-Insert something about a fancy object store here...
-
 ## Deployment
 
 We use `build service` and re-build images on commits to `main` (triggered via GitHub actions).
