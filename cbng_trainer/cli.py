@@ -163,7 +163,7 @@ def run_edit_set(
     "--review-host", default="http://cluebotng-reviewer.tool-cluebotng-review.svc.tools.local:8000", required=True
 )
 @click.option(
-    "--trainer-host", default="http://cluebotng-trainer.tool-cluebotng-trainer.svc.tools.local:8000", required=True
+    "--trainer-host", default="http://file-api.tool-cluebotng-trainer.svc.tools.local:8000", required=True
 )
 @click.option("--release-ref", required=False)
 def run_edit_sets(
