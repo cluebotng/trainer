@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [ "${HOME}" == "/" ] && [ ! -z "${TOOL_DATA_DIR}"];
+if [ "${HOME}" == "/" ] && [ ! -z "${TOOL_DATA_DIR}" ];
 then
     export HOME="${TOOL_DATA_DIR}"
 fi
