@@ -39,7 +39,7 @@ def get_latest_github_release(org: str, repo: str):
 
 
 def get_target_edit_groups(review_host: str, filter_edit_set: List[str]) -> Dict[str, Dict[str, int]]:
-    r = requests.get(f"{review_host}/api/v1/edit-groups/")
+    r = requests.get(f"{review_host}/api/v1/edit-groups/", params={"exclude_empty_editsets": "1"})
     r.raise_for_status()
     data = r.json()
 
