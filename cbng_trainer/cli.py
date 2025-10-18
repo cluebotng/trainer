@@ -158,13 +158,13 @@ def run_edit_set(
 # These are essentially constants
 @click.option("--toolforge-user", default="cluebotng-trainer", required=True)
 @click.option("--max-jobs", default=1, required=True)
-@click.option("--image-name", default="tools-harbor.wmcloud.org/tool-cluebotng-trainer/coordinator:latest", required=True)
+@click.option(
+    "--image-name", default="tools-harbor.wmcloud.org/tool-cluebotng-trainer/coordinator:latest", required=True
+)
 @click.option(
     "--review-host", default="http://cluebotng-reviewer.tool-cluebotng-review.svc.tools.local:8000", required=True
 )
-@click.option(
-    "--trainer-host", default="http://file-api.tool-cluebotng-trainer.svc.tools.local:8000", required=True
-)
+@click.option("--trainer-host", default="http://file-api.tool-cluebotng-trainer.svc.tools.local:8000", required=True)
 @click.option("--release-ref", required=False)
 def run_edit_sets(
     edit_set: List[str],

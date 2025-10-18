@@ -33,13 +33,13 @@ from cbng_trainer.common.consts import JOB_LOGS_END_MARKER
 
 
 def get_latest_github_release(org: str, repo: str):
-    r = requests.get(f"https://api.github.com/repos/{org}/{repo}/releases/latest")
+    r = requests.get(f"https://api.github.com/repos/{org}/{repo}/releases/latest", timeout=10)
     r.raise_for_status()
     return r.json()["tag_name"]
 
 
 def get_target_edit_groups(review_host: str, filter_edit_set: List[str]) -> Dict[str, Dict[str, int]]:
-    r = requests.get(f"{review_host}/api/v1/edit-groups/", params={"exclude_empty_editsets": "1"})
+    r = requests.get(f"{review_host}/api/v1/edit-groups/", params={"exclude_empty_editsets": "1"}, timeout=10)
     r.raise_for_status()
     data = r.json()
 
@@ -110,14 +110,16 @@ def generate_execution_script(
         # Binaries we need to run
         for bin in cluebotng create_ann create_bayes_db print_bayes_db;
         do
-            echo "Downloading https://github.com/cluebotng/core/releases/download/{release_ref}/$bin -> /tmp/cbng-core/$bin"
-            curl --fail -s --connect-timeout 5 --max-time 60 --retry 5 -L --output /tmp/cbng-core/$bin https://github.com/cluebotng/core/releases/download/{release_ref}/$bin
+            url="https://github.com/cluebotng/core/releases/download/{release_ref}/$bin"
+            echo "Downloading $url -> /tmp/cbng-core/$bin"
+            curl --fail -s --connect-timeout 5 --max-time 60 --retry 5 -L --output /tmp/cbng-core/$bin $url
             chmod 755 /tmp/cbng-core/$bin
         done
 
         # Config we need to run
-        echo "Downloading config from https://github.com/cluebotng/core/releases/download/{release_ref}/conf.tar.gz"
-        curl --fail -s --connect-timeout 5 --max-time 60 --retry 5 -L --output /tmp/conf.tar.gz https://github.com/cluebotng/core/releases/download/{release_ref}/conf.tar.gz
+        url="https://github.com/cluebotng/core/releases/download/{release_ref}/conf.tar.gz"
+        echo "Downloading config from $url"
+        curl --fail -s --connect-timeout 5 --max-time 60 --retry 5 -L --output /tmp/conf.tar.gz $url
         tar -C /tmp/cbng-core/ -xf /tmp/conf.tar.gz
 
         # Hack to not require a tty
@@ -155,7 +157,8 @@ def generate_execution_script(
 
         for path, url in files_to_download.items():
             setup_script += f'echo "Downloading {url} -> /tmp/cbng-core/{path}"\n'
-            setup_script += f"curl --fail -s --connect-timeout 5 --max-time 60 --retry 5 -L --output '/tmp/cbng-core/{path}' '{url}'\n"
+            setup_script += "curl --fail -s --connect-timeout 5 --max-time 60 "
+            setup_script += "--retry 5 -L --output '/tmp/cbng-core/{path}' '{url}'\n"
 
     if run_commands:
         setup_script += 'echo "Executing commands"\n'

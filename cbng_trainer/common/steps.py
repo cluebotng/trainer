@@ -25,7 +25,7 @@ SOFTWARE.
 import base64
 import logging
 import os
-import uuid
+import tempfile
 from typing import Dict, List
 
 import requests
@@ -74,7 +74,7 @@ class Steps:
             return
 
         if not self._file_api_key:
-            logger.error(f"Failed to find api key, skipping log upload")
+            logger.error("Failed to find api key, skipping log upload")
             return
 
         # Note: we are not in a container at this point, so access the API directly,
@@ -85,6 +85,7 @@ class Steps:
             target_url,
             headers={"Authorization": f"Bearer {self._file_api_key}"},
             data="\n".join(self._clean_log_lines(logs)),
+            timeout=60,
         )
         if r.status_code != 201:
             logger.warning(f"Failed to upload logs for {identifier}: {r.status_code} ({r.text})")
@@ -92,14 +93,15 @@ class Steps:
     def store_edit_sets(self, mapping: Dict[str, str]) -> bool:
         commands = []
         for download_url, upload_url in mapping.items():
-            temp_path = f"/tmp/{uuid.uuid4().hex}"
-            commands.extend(
-                [
-                    f"echo \"Downloading '{download_url}' to '{temp_path}'\"",
-                    f"curl --fail --progress-bar -sL --output '{temp_path}' '{download_url}'",
-                    f'upload_file "{temp_path}" "{upload_url}"',
-                ]
-            )
+            with tempfile.TemporaryDirectory() as tmp:
+                tmp_path = tmp.name
+                commands.extend(
+                    [
+                        f"echo \"Downloading '{download_url}' to '{tmp_path}'\"",
+                        f"curl --fail --progress-bar -sL --output '{tmp_path}' '{download_url}'",
+                        f'upload_file "{tmp_path}" "{upload_url}"',
+                    ]
+                )
 
         success, logs = run_job(
             target_user=self.toolforge_user,
