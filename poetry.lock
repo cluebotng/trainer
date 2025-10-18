@@ -1564,14 +1564,14 @@ test = ["devpi-process (>=1.0.2)", "pytest (>=8.3.3)", "pytest-mock (>=3.14)"]
 
 [[package]]
 name = "tox-current-env"
-version = "0.0.14"
+version = "0.0.16"
 description = "Use current environment instead of virtualenv for tox testenvs"
 optional = false
 python-versions = ">=3.6"
 groups = ["test"]
 files = [
-    {file = "tox_current_env-0.0.14-py3-none-any.whl", hash = "sha256:eead4fba871be225fbbf80af0ca58fde25574ffb9ad2d9d79b41b91349873285"},
-    {file = "tox_current_env-0.0.14.tar.gz", hash = "sha256:5bae55e40d544239128699c32061edd635593538d60695925c6442a0e18540f0"},
+    {file = "tox_current_env-0.0.16-py3-none-any.whl", hash = "sha256:88db23525a6514dee6350df01f5b591654b72e7709df3c57e9e1edb1bbc22737"},
+    {file = "tox_current_env-0.0.16.tar.gz", hash = "sha256:2e453c3e82e837d35846004a678db4504e24e5c0419d6e42aa07ca8294fad1bd"},
 ]
 
 [package.dependencies]
@@ -1797,4 +1797,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12"
-content-hash = "6e6a7e039d05bd709e70724aa3099738425fd1996c50fed1a87959985e497600"
+content-hash = "5b12cc8c6b18994b328ef200a07470534eeb4f2baca555ddb62a41ea2fde85a0"
