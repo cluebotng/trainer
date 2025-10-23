@@ -16,7 +16,7 @@ dependencies = [
 [tool.poetry.group.test.dependencies]
 tox = "4.24.1"
 tox-current-env = "0.0.16"
-black = "25.1.0"
+black = "25.9.0"
 ruff = "0.14.1"
 bandit = "1.8.6"
 
