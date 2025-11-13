@@ -95,7 +95,7 @@ def generate_execution_script(
                 --retry 5 \
                 -s \
                 -H@/tmp/file-api-headers \
-                --data-binary "@${source_path}" \
+                 --upload-file "${source_path}" \
                 "${target_url}"
         else
             echo "Skipping upload of ${source_path} to ${target_url}"
