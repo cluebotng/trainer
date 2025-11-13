@@ -25,7 +25,7 @@ SOFTWARE.
 import base64
 import logging
 import os
-import tempfile
+import uuid
 from typing import Dict, List
 
 import requests
@@ -93,15 +93,14 @@ class Steps:
     def store_edit_sets(self, mapping: Dict[str, str]) -> bool:
         commands = []
         for download_url, upload_url in mapping.items():
-            with tempfile.TemporaryFile() as tmp:
-                tmp_path = tmp.name
-                commands.extend(
-                    [
-                        f"echo \"Downloading '{download_url}' to '{tmp_path}'\"",
-                        f"curl --fail --progress-bar -sL --output '{tmp_path}' '{download_url}'",
-                        f'upload_file "{tmp_path}" "{upload_url}"',
-                    ]
-                )
+            tmp_path = f"/tmp/{uuid.uuid4().hex}"
+            commands.extend(
+                [
+                    f"echo \"Downloading '{download_url}' to '{tmp_path}'\"",
+                    f"curl --fail --progress-bar -sL --output '{tmp_path}' '{download_url}'",
+                    f'upload_file "{tmp_path}" "{upload_url}"',
+                ]
+            )
 
         success, logs = run_job(
             target_user=self.toolforge_user,
