@@ -191,6 +191,7 @@ def run_job(
     )
 
     logger.info(f"[{job_name}] Creating job")
+    job_request_time = datetime.now()
     if not _run_job(
         target_user=target_user,
         job_name=job_name,
@@ -222,9 +223,7 @@ def run_job(
     seen_logs = []
     if start_time is False:
         logger.info(f"[{job_name}] Job failed to start")
-        _wait_for_logs_end_marker(
-            target_user=target_user, job_name=job_name, start_time=waiting_start_time, seen_logs=seen_logs
-        )
+        _peak_at_logs(target_user=target_user, job_name=job_name, start_time=job_request_time, seen_logs=seen_logs)
         _delete_job(target_user, job_name)
         return False, seen_logs
 
