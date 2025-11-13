@@ -30,7 +30,7 @@ def _run_job(
     job_name: str,
     image: str,
     command: str,
-):
+) -> bool:
     api = _client_config(target_user)
     try:
         api.post(
@@ -43,7 +43,9 @@ def _run_job(
             },
         )
     except HTTPError as e:
-        raise Exception(f"Failed to create {job_name}: [{e.response.status_code}] {e.response.text}")
+        logger.error(f"Failed to create {job_name}: [{e.response.status_code}] {e.response.text}")
+        return False
+    return True
 
 
 def _delete_job(target_user: str, name: str):
@@ -189,12 +191,13 @@ def run_job(
     )
 
     logger.info(f"[{job_name}] Creating job")
-    _run_job(
+    if not _run_job(
         target_user=target_user,
         job_name=job_name,
         image=image_name,
         command=generate_command_command(execution_script, run_timeout),
-    )
+    ):
+        return False, []
 
     if not wait_for_completion:
         return True, []
