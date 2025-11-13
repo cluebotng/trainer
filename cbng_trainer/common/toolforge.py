@@ -42,7 +42,7 @@ def _run_job(
             },
         )
     except HTTPError as e:
-        logger.error(f"Failed to create {job_name}: [{e.response.status_code}] {e.response.text}")
+        logger.error(f"Failed to create {job_name}: {e}")
         return False
     return True
 
@@ -52,7 +52,7 @@ def _delete_job(target_user: str, name: str):
     try:
         api.delete(f"/jobs/v1/tool/{target_user}/jobs/{name}/")
     except HTTPError as e:
-        logger.warning(f"Failed to delete {name}: [{e.response.status_code}] {e.response.text}")
+        logger.warning(f"Failed to delete {name}: {e}")
 
 
 def _job_was_successful(target_user: str, name: str) -> bool:
@@ -60,7 +60,7 @@ def _job_was_successful(target_user: str, name: str) -> bool:
     try:
         resp = api.get(f"/jobs/v1/tool/{target_user}/jobs/{name}/")
     except HTTPError as e:
-        logger.error(f"Failed to get {name}: [{e.response.status_code}] {e.response.text}")
+        logger.error(f"Failed to get {name}: {e}")
         return False
     return resp["job"]["status_short"] == "Completed" and "Exit code '0'" in resp["job"]["status_long"]
 
@@ -70,9 +70,8 @@ def _job_is_running(target_user: str, name: str) -> bool:
     try:
         resp = api.get(f"/jobs/v1/tool/{target_user}/jobs/{name}/")
     except HTTPError as e:
-        if e.response.status_code == 404:
-            return False
-        logger.error(f"Failed to get {name}: [{e.response.status_code}] {e.response.text}")
+        if e.response is None or e.response.status_code != 404:
+            logger.error(f"Failed to get {name}: {e}")
         return False
 
     return "Running for " in resp["job"]["status_short"]
@@ -83,9 +82,8 @@ def _wait_for_job_to_start(target_user: str, job_name: str) -> Optional[Union[da
     try:
         resp = api.get(f"/jobs/v1/tool/{target_user}/jobs/{job_name}/")
     except HTTPError as e:
-        if e.response.status_code == 404:
-            return None
-        logger.error(f"Failed to get {job_name}: [{e.response.status_code}] {e.response.text}")
+        if e.response is None or e.response.status_code != 404:
+            logger.error(f"Failed to get {job_name}: {e}")
         return None
 
     if resp["job"]["status_short"] == "Failed":
@@ -107,7 +105,7 @@ def _read_logs(target_user: str, job_name: str, start_time: datetime) -> List[Di
             if log["datetime"] >= start_time:
                 logs.append(log)
     except (HTTPError, ReadTimeout) as e:
-        if e.response.status_code != 404:
+        if e.response is None or e.response.status_code != 404:
             logger.warning(f"Failed to get logs for {job_name}: {e}")
     return logs
 
@@ -150,7 +148,7 @@ def number_of_running_jobs(target_user: str, prefix: Optional[str] = None) -> Op
     try:
         resp = api.get(f"/jobs/v1/tool/{target_user}/jobs/")
     except HTTPError as e:
-        logger.error(f"Failed to get jobs: [{e.response.status_code}] {e.response.text}")
+        logger.error(f"Failed to get jobs: {e}")
         return None
 
     return len(
@@ -256,8 +254,8 @@ def create_or_update_envvar(target_user: str, name: str, value: str) -> None:
     try:
         resp = api.get(f"/envvars/v1/tool/{target_user}/envvars/{name}")
     except HTTPError as e:
-        if e.response.status_code != 404:
-            logger.error(f"Failed to get envvar: [{e.response.status_code}] {e.response.text}")
+        if e.response is None or e.response.status_code != 404:
+            logger.error(f"Failed to get envvar: {e}")
             return
 
         logger.info(f"Creating envvar {name}")
@@ -270,4 +268,4 @@ def create_or_update_envvar(target_user: str, name: str, value: str) -> None:
     try:
         api.post(f"/envvars/v1/tool/{target_user}/envvars", json={"name": name, "value": value})
     except HTTPError as e:
-        logger.error(f"Failed to write envvar: [{e.response.status_code}] {e.response.text}")
+        logger.error(f"Failed to write envvar: {e}")
