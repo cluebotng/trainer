@@ -1,4 +1,3 @@
-import json
 import logging
 import re
 import time
@@ -102,19 +101,14 @@ def _read_logs(target_user: str, job_name: str, start_time: datetime) -> List[Di
 
     logs = []
     try:
-        for raw_line in api.get_raw_lines(
-            f"/jobs/v1/tool/{target_user}/jobs/{job_name}/logs/",
-            params={"follow": "false"},
-            timeout=30,
-        ):
-            log = json.loads(raw_line)
+        response = api.get(f"/logs/v1/tool/{target_user}/job/{job_name}/logs", timeout=30)
+        for log in response["data"]["logs"]:
             log["datetime"] = datetime.fromisoformat(log["datetime"])
             if log["datetime"] >= start_time:
                 logs.append(log)
     except HTTPError as e:
-        if e.response.status_code == 404:
-            return []
-        raise e
+        if e.response.status_code != 404:
+            logger.warning(f"Failed to get logs for {job_name}: {e}")
     return logs
 
 
