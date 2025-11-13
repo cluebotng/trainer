@@ -158,7 +158,7 @@ def generate_execution_script(
 
         for path, url in files_to_download.items():
             setup_script += f'echo "Downloading {url} -> /tmp/cbng-core/{path}"\n'
-            setup_script += "curl --fail -s --connect-timeout 5 --max-time 60 "
+            setup_script += "curl --fail -i -s --connect-timeout 600 --max-time 600 "
             setup_script += "--retry 5 -L --output '/tmp/cbng-core/{path}' '{url}'\n"
 
     if run_commands:
