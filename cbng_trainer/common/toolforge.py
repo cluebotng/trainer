@@ -114,6 +114,10 @@ def _read_logs(target_user: str, job_name: str, start_time: datetime) -> List[Di
 
 def _peak_at_logs(target_user: str, job_name: str, start_time: datetime, seen_logs: List[str]):
     for log in _read_logs(target_user, job_name, start_time):
+        # Work around T410055
+        if log["pod"] == "nopod" and log["container"] == "nocontainer":
+            continue
+
         log_line = f'{log["datetime"].isoformat()}: {log["message"]}'
         if log_line in seen_logs:
             continue
