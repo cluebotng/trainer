@@ -99,7 +99,7 @@ def _read_logs(target_user: str, job_name: str, start_time: datetime) -> List[Di
 
     logs = []
     try:
-        response = api.get(f"/logs/v1/tool/{target_user}/job/{job_name}/logs", timeout=30)
+        response = api.get(f"/logs/v1/tool/{target_user}/job/{job_name}/logs", timeout=60)
         for log in response["data"]["logs"]:
             log["datetime"] = datetime.fromisoformat(log["datetime"])
             if log["datetime"] >= start_time:
