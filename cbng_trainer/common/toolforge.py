@@ -1,7 +1,7 @@
 import logging
 import re
 import time
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta, UTC, timezone
 from typing import Optional, Dict, List, Any, Tuple, Union
 
 from requests.exceptions import HTTPError, ReadTimeout
@@ -185,7 +185,7 @@ def run_job(
     )
 
     logger.info(f"[{job_name}] Creating job")
-    job_request_time = datetime.now()
+    job_request_time = datetime.now(timezone.utc)
     if not _run_job(
         target_user=target_user,
         job_name=job_name,
