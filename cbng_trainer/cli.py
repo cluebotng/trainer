@@ -29,10 +29,11 @@ from datetime import datetime, timezone
 from typing import Optional, List
 
 import click
+from toolforge_weld.kubernetes_config import Kubeconfig
 
 from cbng_trainer.common.files import calculate_target_path
 from cbng_trainer.common.steps import Steps
-from cbng_trainer.common.toolforge import run_job, number_of_running_jobs
+from cbng_trainer.common.toolforge import run_job, number_of_running_jobs, create_or_update_envvar
 from cbng_trainer.common.utils import (
     get_target_edit_groups,
     get_latest_github_release,
@@ -155,6 +156,7 @@ def run_edit_set(
 @cli.command()
 @click.option("--edit-set", multiple=True, default=None)
 @click.option("--print-only/--no-print-only", default=False)
+@click.option("--copy-credentials/--no-copy-credentials", default=True)
 # These are essentially constants
 @click.option("--toolforge-user", default="cluebotng-trainer", required=True)
 @click.option("--max-jobs", default=1, required=True)
@@ -169,6 +171,7 @@ def run_edit_set(
 def run_edit_sets(
     edit_set: List[str],
     print_only: bool,
+    copy_credentials: bool,
     toolforge_user: str,
     image_name: str,
     review_host: str,
@@ -176,6 +179,15 @@ def run_edit_sets(
     release_ref: Optional[str],
     max_jobs: int,
 ) -> None:
+    if copy_credentials:
+        kubeconfig = Kubeconfig.load()
+
+        with kubeconfig.client_cert_file.open("r") as fh:
+            create_or_update_envvar(toolforge_user, "K8S_CLIENT_CRT", fh.read())
+
+        with kubeconfig.client_key_file.open("r") as fh:
+            create_or_update_envvar(toolforge_user, "K8S_CLIENT_KEY", fh.read())
+
     if not release_ref:
         release_ref = get_latest_github_release("cluebotng", "core")
     target_groups = get_target_edit_groups(review_host, edit_set)
