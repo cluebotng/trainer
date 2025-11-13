@@ -124,7 +124,7 @@ def _peak_at_logs(target_user: str, job_name: str, start_time: datetime, seen_lo
         if log_line in seen_logs:
             continue
         # Emit what we have not yet emitted "sad streaming"
-        logger.info(log_line)
+        logger.info(f"[{job_name}] {log['message']}")
         seen_logs.append(log_line)
 
 
