@@ -251,3 +251,26 @@ def run_job(
 
     _delete_job(target_user, job_name)
     return success, seen_logs
+
+
+def create_or_update_envvar(target_user: str, name: str, value: str) -> None:
+    api = _client_config(target_user)
+
+    try:
+        resp = api.get(f"/envvars/v1/tool/{target_user}/envvars/{name}")
+    except HTTPError as e:
+        if e.response.status_code != 404:
+            logger.error(f"Failed to get envvar: [{e.response.status_code}] {e.response.text}")
+            return
+
+        logger.info(f"Creating envvar {name}")
+    else:
+        if resp["envvar"]["value"] == value:
+            logger.info(f"Skipping envvar {name}, contents matches")
+            return
+        logger.info(f"Updating envvar {name}")
+
+    try:
+        api.post(f"/envvars/v1/tool/{target_user}/envvars", json={"name": name, "value": value})
+    except HTTPError as e:
+        logger.error(f"Failed to write envvar: [{e.response.status_code}] {e.response.text}")
