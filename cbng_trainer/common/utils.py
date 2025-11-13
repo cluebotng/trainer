@@ -88,9 +88,10 @@ def generate_execution_script(
             echo "Uploading ${source_path} to ${target_url}"
 
             curl \
+                -i \
                 --fail \
-                --connect-timeout 5 \
-                --max-time 60 \
+                --connect-timeout 300 \
+                --max-time 300 \
                 --retry 5 \
                 -s \
                 -H@/tmp/file-api-headers \
