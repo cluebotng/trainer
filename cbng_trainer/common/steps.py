@@ -93,7 +93,8 @@ class Steps:
     def store_edit_sets(self, mapping: Dict[str, str]) -> bool:
         commands = []
         for download_url, upload_url in mapping.items():
-            with tempfile.TemporaryDirectory() as tmp_path:
+            with tempfile.TemporaryFile() as tmp:
+                tmp_path = tmp.name
                 commands.extend(
                     [
                         f"echo \"Downloading '{download_url}' to '{tmp_path}'\"",
