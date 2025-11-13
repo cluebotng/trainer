@@ -4,7 +4,7 @@ import time
 from datetime import datetime, timedelta, UTC
 from typing import Optional, Dict, List, Any, Tuple, Union
 
-from requests.exceptions import HTTPError
+from requests.exceptions import HTTPError, ReadTimeout
 from toolforge_weld.api_client import ToolforgeClient
 from toolforge_weld.config import load_config
 from toolforge_weld.kubernetes_config import Kubeconfig
@@ -106,7 +106,7 @@ def _read_logs(target_user: str, job_name: str, start_time: datetime) -> List[Di
             log["datetime"] = datetime.fromisoformat(log["datetime"])
             if log["datetime"] >= start_time:
                 logs.append(log)
-    except HTTPError as e:
+    except (HTTPError, ReadTimeout) as e:
         if e.response.status_code != 404:
             logger.warning(f"Failed to get logs for {job_name}: {e}")
     return logs
