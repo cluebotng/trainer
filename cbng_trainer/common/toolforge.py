@@ -1,7 +1,7 @@
 import logging
 import re
 import time
-from datetime import datetime, timedelta, UTC, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, List, Any, Tuple, Union
 
 from requests.exceptions import HTTPError, ReadTimeout
@@ -143,23 +143,6 @@ def _wait_for_logs_end_marker(
         time.sleep(1)
 
 
-def number_of_running_jobs(target_user: str, prefix: Optional[str] = None) -> Optional[int]:
-    api = _client_config(target_user)
-    try:
-        resp = api.get(f"/jobs/v1/tool/{target_user}/jobs/")
-    except HTTPError as e:
-        logger.error(f"Failed to get jobs: {e}")
-        return None
-
-    return len(
-        [
-            job
-            for job in resp["jobs"]
-            if "Running for " in job["status_short"] and (prefix is None or job["name"].startswith(prefix))
-        ]
-    )
-
-
 def run_job(
     target_user: str,
     job_name: str,
@@ -200,7 +183,7 @@ def run_job(
         return True, []
 
     logger.info(f"[{job_name}] Waiting for job to start")
-    waiting_start_time = datetime.now(tz=UTC)
+    waiting_start_time = datetime.now(tz=timezone.utc)
     while True:
         start_time = _wait_for_job_to_start(
             target_user=target_user,
@@ -210,7 +193,7 @@ def run_job(
         if start_time is not None:
             break
 
-        if waiting_start_time + timedelta(seconds=start_timeout) < datetime.now(tz=UTC):
+        if waiting_start_time + timedelta(seconds=start_timeout) < datetime.now(tz=timezone.utc):
             logger.error(f"[{job_name}] Job failed to start within timeout")
             return False, []
 
