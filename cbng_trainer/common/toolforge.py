@@ -110,28 +110,28 @@ def _read_logs(target_user: str, job_name: str, start_time: datetime) -> List[Di
     return logs
 
 
-def _peak_at_logs(target_user: str, job_name: str, start_time: datetime, seen_logs: List[str]):
+def _peak_at_logs(target_user: str, job_name: str, start_time: datetime, seen_logs: List[Tuple[datetime, str]]):
     for log in _read_logs(target_user, job_name, start_time):
         # Work around T410055
         if log["pod"] == "nopod" and log["container"] == "nocontainer":
             continue
 
         log_line = f'{log["datetime"].isoformat()}: {log["message"]}'
-        if log_line in seen_logs:
+        if (log["datetime"], log_line) in seen_logs:
             continue
         # Emit what we have not yet emitted "sad streaming"
         logger.info(f"[{job_name}] {log['message']}")
-        seen_logs.append(log_line)
+        seen_logs.append((log["datetime"], log_line))
 
 
 def _wait_for_logs_end_marker(
-    target_user: str, job_name: str, start_time: datetime, seen_logs: List[str], timeout: int = 300
+    target_user: str, job_name: str, start_time: datetime, seen_logs: List[Tuple[datetime, str]], timeout: int = 300
 ):
     waiting_start_time = time.time()
     while True:
         _peak_at_logs(target_user, job_name, start_time, seen_logs)
 
-        for line in seen_logs:
+        for timestamp, line in seen_logs:
             if line.strip().endswith(f": {JOB_LOGS_END_MARKER}"):
                 logger.info(f"[{job_name}] Found log end marker")
                 return
@@ -158,7 +158,7 @@ def run_job(
     run_timeout: str = "2h",
     start_timeout: int = 300,
     wait_for_job_logs_marker: bool = True,
-) -> Tuple[bool, List[str]]:
+) -> Tuple[bool, List[Tuple[datetime, str]]]:
     execution_script = generate_execution_script(
         release_ref,
         download_bins_url,
