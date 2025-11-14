@@ -218,7 +218,7 @@ def run_job(
 
     seen_logs = []
     if start_time is False:
-        logger.info(f"[{job_name}] Job failed to start")
+        logger.error(f"[{job_name}] Job failed to start")
         _peak_at_logs(target_user=target_user, job_name=job_name, start_time=job_request_time, seen_logs=seen_logs)
         _delete_job(target_user, job_name)
         return False, seen_logs
@@ -233,7 +233,10 @@ def run_job(
         time.sleep(1)
 
     success = _job_was_successful(target_user, job_name)
-    logger.info(f"[{job_name}] Job {'succeeded' if success else 'failed'}")
+    if success:
+        logger.info(f"[{job_name}] Job succeeded")
+    else:
+        logger.error(f"[{job_name}] Job failed")
 
     if wait_for_job_logs_marker and success:
         # If we are a step, then we wait for the explicit end marker
