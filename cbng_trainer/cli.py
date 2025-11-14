@@ -35,7 +35,6 @@ from cbng_trainer.common.steps import Steps
 from cbng_trainer.common.toolforge import run_job, create_or_update_envvar
 from cbng_trainer.common.utils import (
     get_target_edit_groups,
-    get_latest_github_release,
     clean_job_name,
 )
 
@@ -56,15 +55,15 @@ def cli() -> None:
 @click.option("--download-trial", required=False)
 # Internal
 @click.option("--toolforge-user", default="cluebotng-trainer", required=True)
-@click.option("--image-name", required=True)
-@click.option("--release-ref", required=True)
+@click.option("--trainer-image-name", required=True)
+@click.option("--core-image-name", required=True)
 @click.option("--trainer-host", required=True)
 def run_edit_set(
     target_name: str,
     instance_name: str,
     toolforge_user: str,
-    image_name: str,
-    release_ref: str,
+    trainer_image_name: str,
+    core_image_name: str,
     trainer_host: str,
     download_training: str,
     download_trial: Optional[str],
@@ -72,8 +71,8 @@ def run_edit_set(
     steps = Steps(
         toolforge_user=toolforge_user,
         target_name=target_name,
-        image_name=image_name,
-        release_ref=release_ref,
+        trainer_image_name=trainer_image_name,
+        core_image_name=core_image_name,
         upload_logs=calculate_target_path(trainer_host, target_name, instance_name, "logs"),
     )
 
@@ -86,7 +85,7 @@ def run_edit_set(
             download_trial: calculate_target_path(trainer_host, target_name, instance_name, "edit-sets", "trial.xml")
         }
 
-    # logger.info("Downloading files")
+    logger.info("Downloading files")
     if not steps.store_edit_sets(mapping=files_to_download):
         logger.error("Downloading files failed")
         return
@@ -137,7 +136,6 @@ def run_edit_set(
         logger.info("Executing trial")
         if not steps.run_trial_report(
             download_edit_set_url=files_to_download[download_trial],
-            download_bins_url=calculate_target_path(trainer_host, target_name, instance_name, "artifacts"),
             upload_report_url=calculate_target_path(trainer_host, target_name, instance_name, "trial"),
         ):
             logger.error("Trial report failed")
@@ -159,22 +157,22 @@ def run_edit_set(
 # These are essentially constants
 @click.option("--toolforge-user", default="cluebotng-trainer", required=True)
 @click.option(
-    "--image-name", default="tools-harbor.wmcloud.org/tool-cluebotng-trainer/coordinator:latest", required=True
+    "--trainer-image-name", default="tools-harbor.wmcloud.org/tool-cluebotng-trainer/coordinator:latest", required=True
 )
+@click.option("--core-image-name", default="tools-harbor.wmcloud.org/tool-cluebotng/core:latest", required=True)
 @click.option(
     "--review-host", default="http://cluebotng-reviewer.tool-cluebotng-review.svc.tools.local:8000", required=True
 )
 @click.option("--trainer-host", default="http://file-api.tool-cluebotng-trainer.svc.tools.local:8000", required=True)
-@click.option("--release-ref", required=False)
 def run_edit_sets(
     edit_set: List[str],
     print_only: bool,
     copy_credentials: bool,
     toolforge_user: str,
-    image_name: str,
+    trainer_image_name: str,
+    core_image_name: str,
     review_host: str,
     trainer_host: str,
-    release_ref: Optional[str],
 ) -> None:
     if copy_credentials and not print_only:
         kubeconfig = Kubeconfig.load()
@@ -185,8 +183,6 @@ def run_edit_sets(
         with kubeconfig.client_key_file.open("r") as fh:
             create_or_update_envvar(toolforge_user, "K8S_CLIENT_KEY", fh.read())
 
-    if not release_ref:
-        release_ref = get_latest_github_release("cluebotng", "core")
     target_groups = get_target_edit_groups(review_host, edit_set)
 
     run_instance = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
@@ -216,10 +212,10 @@ def run_edit_sets(
                 "launcher",
                 "./deployment/entrypoint.sh",
                 "run-edit-set",
-                f'--image-name="{image_name}"',
+                f'--trainer-image-name="{trainer_image_name}"',
+                f'--core-image-name="{core_image_name}"',
                 f'--target-name="{target_name}"',
                 f'--instance-name="{run_instance}"',
-                f'--release-ref="{release_ref}"',
                 f'--trainer-host="{trainer_host}"',
             ]
             if group_name in {"Generic", "Reported False Positives", "Training"}:
@@ -249,8 +245,7 @@ def run_edit_sets(
         success, _ = run_job(
             target_user=toolforge_user,
             job_name=container_name,
-            image_name=image_name,
-            skip_setup=True,
+            image_name=trainer_image_name,
             run_commands=[script],
             wait_for_completion=True,
             wait_for_job_logs_marker=False,
