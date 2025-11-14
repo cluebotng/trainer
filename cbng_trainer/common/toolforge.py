@@ -52,7 +52,8 @@ def _delete_job(target_user: str, name: str):
     try:
         api.delete(f"/jobs/v1/tool/{target_user}/jobs/{name}/")
     except HTTPError as e:
-        logger.warning(f"Failed to delete {name}: {e}")
+        if e.response is None or e.response.status_code != 404:
+            logger.warning(f"Failed to delete {name}: {e}")
 
 
 def _job_was_successful(target_user: str, name: str) -> bool:
@@ -147,26 +148,22 @@ def run_job(
     target_user: str,
     job_name: str,
     image_name: str,
-    release_ref: Optional[str] = None,
-    download_edit_set_url: Optional[str] = None,
-    download_bins_url: Optional[str] = None,
-    override_file_urls: Optional[Dict[str, str]] = None,
+    download_file_urls: Optional[Dict[str, str]] = None,
     run_commands: Optional[List[str]] = None,
-    skip_setup: bool = False,
-    skip_binary_setup: bool = False,
     wait_for_completion: bool = True,
-    run_timeout: str = "2h",
+    run_timeout: int = 7200,
     start_timeout: int = 300,
     wait_for_job_logs_marker: bool = True,
+    configure_upload_file_helper: bool = None,
 ) -> Tuple[bool, List[Tuple[datetime, str]]]:
     execution_script = generate_execution_script(
-        release_ref,
-        download_bins_url,
-        download_edit_set_url,
-        override_file_urls,
-        skip_setup,
-        skip_binary_setup,
-        run_commands,
+        download_file_urls=download_file_urls,
+        run_commands=run_commands,
+        configure_upload_file_helper=configure_upload_file_helper is True or (
+            configure_upload_file_helper is None and any(
+                [run_command.strip().startswith("upload_file") for run_command in run_commands]
+            )
+        ),
     )
 
     logger.info(f"[{job_name}] Creating job")
@@ -221,7 +218,7 @@ def run_job(
     else:
         logger.error(f"[{job_name}] Job failed")
 
-    if wait_for_job_logs_marker and success:
+    if wait_for_job_logs_marker:
         # If we are a step, then we wait for the explicit end marker
         _wait_for_logs_end_marker(
             target_user=target_user, job_name=job_name, start_time=waiting_start_time, seen_logs=seen_logs
