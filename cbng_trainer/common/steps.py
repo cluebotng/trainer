@@ -26,7 +26,8 @@ import base64
 import logging
 import os
 import uuid
-from typing import Dict, List
+from datetime import datetime
+from typing import Dict, List, Tuple
 
 import requests
 
@@ -53,9 +54,9 @@ class Steps:
         self.upload_logs = upload_logs
         self._file_api_key = os.environ.get("FILE_API_KEY", "")
 
-    def _clean_log_lines(self, logs: List[str]) -> List[str]:
+    def _clean_log_lines(self, logs: List[Tuple[datetime, str]]) -> List[str]:
         clean_lines = []
-        for line in logs:
+        for _, line in sorted(logs, key=lambda x: (x[0], x[1])):
             # Remove the internal marker
             if line.strip().endswith(f": {JOB_LOGS_END_MARKER}"):
                 continue
@@ -68,7 +69,7 @@ class Steps:
 
         return clean_lines
 
-    def _upload_logs(self, identifier: str, logs: List[str]) -> None:
+    def _upload_logs(self, identifier: str, logs: List[Tuple[datetime, str]]) -> None:
         if not logs:
             logger.debug(f"No logs to upload for {identifier}")
             return
