@@ -24,7 +24,6 @@ SOFTWARE.
 """
 import logging
 import sys
-import time
 from datetime import datetime, timezone
 from typing import Optional, List
 
@@ -33,7 +32,7 @@ from toolforge_weld.kubernetes_config import Kubeconfig
 
 from cbng_trainer.common.files import calculate_target_path
 from cbng_trainer.common.steps import Steps
-from cbng_trainer.common.toolforge import run_job, number_of_running_jobs, create_or_update_envvar
+from cbng_trainer.common.toolforge import run_job, create_or_update_envvar
 from cbng_trainer.common.utils import (
     get_target_edit_groups,
     get_latest_github_release,
@@ -159,7 +158,6 @@ def run_edit_set(
 @click.option("--copy-credentials/--no-copy-credentials", default=True)
 # These are essentially constants
 @click.option("--toolforge-user", default="cluebotng-trainer", required=True)
-@click.option("--max-jobs", default=1, required=True)
 @click.option(
     "--image-name", default="tools-harbor.wmcloud.org/tool-cluebotng-trainer/coordinator:latest", required=True
 )
@@ -177,7 +175,6 @@ def run_edit_sets(
     review_host: str,
     trainer_host: str,
     release_ref: Optional[str],
-    max_jobs: int,
 ) -> None:
     if copy_credentials:
         kubeconfig = Kubeconfig.load()
@@ -249,23 +246,13 @@ def run_edit_sets(
     # Each coord will spawn 1 child at a time, so each job counts for 2
     # We also need 1 for ourselves so 15 - 1 = 14, 14/2 = 7...
     for container_name, script in targets:
-        if max_jobs > 1:
-            while True:
-                currently_running_jobs = number_of_running_jobs(toolforge_user, "coord-")
-                if currently_running_jobs is not None and currently_running_jobs < max_jobs:
-                    logger.info(f"Have quota [{currently_running_jobs} vs {max_jobs}]... spawning")
-                    break
-
-                logger.info(f"Have no quota [{currently_running_jobs} vs {max_jobs}]... waiting")
-                time.sleep(1)
-
         success, _ = run_job(
             target_user=toolforge_user,
             job_name=container_name,
             image_name=image_name,
             skip_setup=True,
             run_commands=[script],
-            wait_for_completion=(max_jobs == 1),
+            wait_for_completion=True,
             wait_for_job_logs_marker=False,
         )
         if not success:
