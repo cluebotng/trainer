@@ -93,7 +93,7 @@ class Steps:
     def store_edit_sets(self, mapping: Dict[str, str]) -> bool:
         commands = []
         for download_url, upload_url in mapping.items():
-            tmp_path = f"/tmp/{uuid.uuid4().hex}"
+            tmp_path = f"/tmp/{uuid.uuid4().hex}"  # nosec: B108
             commands.extend(
                 [
                     f"echo \"Downloading '{download_url}' to '{tmp_path}'\"",
