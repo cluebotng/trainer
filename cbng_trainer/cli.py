@@ -176,7 +176,7 @@ def run_edit_sets(
     trainer_host: str,
     release_ref: Optional[str],
 ) -> None:
-    if copy_credentials:
+    if copy_credentials and not print_only:
         kubeconfig = Kubeconfig.load()
 
         with kubeconfig.client_cert_file.open("r") as fh:
