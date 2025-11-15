@@ -1,7 +1,7 @@
 import logging
 import re
 import time
-from datetime import datetime, timedelta, UTC, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, List, Any, Tuple, Union
 
 from requests.exceptions import HTTPError, ReadTimeout
@@ -52,7 +52,8 @@ def _delete_job(target_user: str, name: str):
     try:
         api.delete(f"/jobs/v1/tool/{target_user}/jobs/{name}/")
     except HTTPError as e:
-        logger.warning(f"Failed to delete {name}: {e}")
+        if e.response is None or e.response.status_code != 404:
+            logger.warning(f"Failed to delete {name}: {e}")
 
 
 def _job_was_successful(target_user: str, name: str) -> bool:
@@ -110,28 +111,28 @@ def _read_logs(target_user: str, job_name: str, start_time: datetime) -> List[Di
     return logs
 
 
-def _peak_at_logs(target_user: str, job_name: str, start_time: datetime, seen_logs: List[str]):
+def _peak_at_logs(target_user: str, job_name: str, start_time: datetime, seen_logs: List[Tuple[datetime, str]]):
     for log in _read_logs(target_user, job_name, start_time):
         # Work around T410055
         if log["pod"] == "nopod" and log["container"] == "nocontainer":
             continue
 
         log_line = f'{log["datetime"].isoformat()}: {log["message"]}'
-        if log_line in seen_logs:
+        if (log["datetime"], log_line) in seen_logs:
             continue
         # Emit what we have not yet emitted "sad streaming"
         logger.info(f"[{job_name}] {log['message']}")
-        seen_logs.append(log_line)
+        seen_logs.append((log["datetime"], log_line))
 
 
 def _wait_for_logs_end_marker(
-    target_user: str, job_name: str, start_time: datetime, seen_logs: List[str], timeout: int = 300
+    target_user: str, job_name: str, start_time: datetime, seen_logs: List[Tuple[datetime, str]], timeout: int = 300
 ):
     waiting_start_time = time.time()
     while True:
         _peak_at_logs(target_user, job_name, start_time, seen_logs)
 
-        for line in seen_logs:
+        for timestamp, line in seen_logs:
             if line.strip().endswith(f": {JOB_LOGS_END_MARKER}"):
                 logger.info(f"[{job_name}] Found log end marker")
                 return
@@ -143,47 +144,26 @@ def _wait_for_logs_end_marker(
         time.sleep(1)
 
 
-def number_of_running_jobs(target_user: str, prefix: Optional[str] = None) -> Optional[int]:
-    api = _client_config(target_user)
-    try:
-        resp = api.get(f"/jobs/v1/tool/{target_user}/jobs/")
-    except HTTPError as e:
-        logger.error(f"Failed to get jobs: {e}")
-        return None
-
-    return len(
-        [
-            job
-            for job in resp["jobs"]
-            if "Running for " in job["status_short"] and (prefix is None or job["name"].startswith(prefix))
-        ]
-    )
-
-
 def run_job(
     target_user: str,
     job_name: str,
     image_name: str,
-    release_ref: Optional[str] = None,
-    download_edit_set_url: Optional[str] = None,
-    download_bins_url: Optional[str] = None,
-    override_file_urls: Optional[Dict[str, str]] = None,
+    download_file_urls: Optional[Dict[str, str]] = None,
     run_commands: Optional[List[str]] = None,
-    skip_setup: bool = False,
-    skip_binary_setup: bool = False,
     wait_for_completion: bool = True,
-    run_timeout: str = "2h",
+    run_timeout: int = 7200,
     start_timeout: int = 300,
     wait_for_job_logs_marker: bool = True,
-) -> Tuple[bool, List[str]]:
+    configure_upload_file_helper: bool = None,
+) -> Tuple[bool, List[Tuple[datetime, str]]]:
     execution_script = generate_execution_script(
-        release_ref,
-        download_bins_url,
-        download_edit_set_url,
-        override_file_urls,
-        skip_setup,
-        skip_binary_setup,
-        run_commands,
+        download_file_urls=download_file_urls,
+        run_commands=run_commands,
+        configure_upload_file_helper=configure_upload_file_helper is True or (
+            configure_upload_file_helper is None and any(
+                [run_command.strip().startswith("upload_file") for run_command in run_commands]
+            )
+        ),
     )
 
     logger.info(f"[{job_name}] Creating job")
@@ -200,7 +180,7 @@ def run_job(
         return True, []
 
     logger.info(f"[{job_name}] Waiting for job to start")
-    waiting_start_time = datetime.now(tz=UTC)
+    waiting_start_time = datetime.now(tz=timezone.utc)
     while True:
         start_time = _wait_for_job_to_start(
             target_user=target_user,
@@ -210,7 +190,7 @@ def run_job(
         if start_time is not None:
             break
 
-        if waiting_start_time + timedelta(seconds=start_timeout) < datetime.now(tz=UTC):
+        if waiting_start_time + timedelta(seconds=start_timeout) < datetime.now(tz=timezone.utc):
             logger.error(f"[{job_name}] Job failed to start within timeout")
             return False, []
 
@@ -238,7 +218,7 @@ def run_job(
     else:
         logger.error(f"[{job_name}] Job failed")
 
-    if wait_for_job_logs_marker and success:
+    if wait_for_job_logs_marker:
         # If we are a step, then we wait for the explicit end marker
         _wait_for_logs_end_marker(
             target_user=target_user, job_name=job_name, start_time=waiting_start_time, seen_logs=seen_logs

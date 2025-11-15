@@ -26,11 +26,16 @@ import base64
 import logging
 import os
 import uuid
-from typing import Dict, List
+from datetime import datetime
+from typing import Dict, List, Tuple
 
 import requests
 
-from cbng_trainer.common.consts import THREASHOLDS_PLOT, FALSE_POSITIVES_PLOT, JOB_LOGS_END_MARKER
+from cbng_trainer.common.consts import (
+    THREASHOLDS_PLOT,
+    FALSE_POSITIVES_PLOT,
+    JOB_LOGS_END_MARKER,
+)
 from cbng_trainer.common.toolforge import run_job
 from cbng_trainer.common.utils import clean_job_name
 
@@ -42,20 +47,20 @@ class Steps:
         self,
         target_name: str,
         toolforge_user: str,
-        image_name: str,
-        release_ref: str,
+        trainer_image_name: str,
+        core_image_name: str,
         upload_logs: str,
     ):
         self.target_name = target_name
         self.toolforge_user = toolforge_user
-        self.image_name = image_name
-        self.release_ref = release_ref
+        self.trainer_image_name = trainer_image_name
+        self.core_image_name = core_image_name
         self.upload_logs = upload_logs
         self._file_api_key = os.environ.get("FILE_API_KEY", "")
 
-    def _clean_log_lines(self, logs: List[str]) -> List[str]:
+    def _clean_log_lines(self, logs: List[Tuple[datetime, str]]) -> List[str]:
         clean_lines = []
-        for line in logs:
+        for _, line in sorted(logs, key=lambda x: (x[0], x[1])):
             # Remove the internal marker
             if line.strip().endswith(f": {JOB_LOGS_END_MARKER}"):
                 continue
@@ -68,7 +73,7 @@ class Steps:
 
         return clean_lines
 
-    def _upload_logs(self, identifier: str, logs: List[str]) -> None:
+    def _upload_logs(self, identifier: str, logs: List[Tuple[datetime, str]]) -> None:
         if not logs:
             logger.debug(f"No logs to upload for {identifier}")
             return
@@ -93,10 +98,10 @@ class Steps:
     def store_edit_sets(self, mapping: Dict[str, str]) -> bool:
         commands = []
         for download_url, upload_url in mapping.items():
-            tmp_path = f"/tmp/{uuid.uuid4().hex}"
+            tmp_path = f"/tmp/{uuid.uuid4().hex}"  # nosec: B108
             commands.extend(
                 [
-                    f"echo \"Downloading '{download_url}' to '{tmp_path}'\"",
+                    f"echo 'Downloading {download_url} to {tmp_path}'",
                     f"curl --fail --progress-bar -sL --output '{tmp_path}' '{download_url}'",
                     f'upload_file "{tmp_path}" "{upload_url}"',
                 ]
@@ -105,8 +110,7 @@ class Steps:
         success, logs = run_job(
             target_user=self.toolforge_user,
             job_name=clean_job_name(self.target_name, postfix="store-edit-sets"),
-            image_name=self.image_name,
-            skip_setup=True,
+            image_name=self.core_image_name,
             run_commands=commands,
         )
         self._upload_logs("store-edit-sets", logs)
@@ -120,13 +124,13 @@ class Steps:
         success, logs = run_job(
             target_user=self.toolforge_user,
             job_name=clean_job_name(self.target_name, postfix="bayes-train"),
-            image_name=self.image_name,
-            release_ref=self.release_ref,
-            download_edit_set_url=download_edit_set_url,
-            skip_binary_setup=True,
+            image_name=self.core_image_name,
+            download_file_urls={"edits.xml": download_edit_set_url},
             run_commands=[
                 'echo "Executing bayes_train"',
-                "cd /tmp/cbng-core && mkdir data/ && ./cluebotng -c conf -m bayes_train -f edits.xml",
+                "test -d data/ || mkdir data/",
+                "sed -i s'/, \"train_outputs\"//g' conf/cluebotng.conf",
+                "./cluebotng -c conf -m bayes_train -f edits.xml",
                 f'upload_file "data/main_bayes_train.dat" "{upload_files_url}/main_bayes_train.dat"',
                 f'upload_file "data/two_bayes_train.dat" "{upload_files_url}/two_bayes_train.dat"',
             ],
@@ -142,17 +146,16 @@ class Steps:
         success, logs = run_job(
             target_user=self.toolforge_user,
             job_name=clean_job_name(self.target_name, postfix="create-main-bayes-db"),
-            image_name=self.image_name,
-            release_ref=self.release_ref,
-            download_edit_set_url=download_edit_set_url,
-            skip_binary_setup=True,
-            override_file_urls={
+            image_name=self.core_image_name,
+            download_file_urls={
+                # Produced by store_edit_sets
+                "edits.xml": download_edit_set_url,
                 # Produced by `run_bayes_train`
                 "data/main_bayes_train.dat": f"{upload_files_url}/main_bayes_train.dat",
             },
             run_commands=[
                 'echo "Executing create_bayes_db"',
-                "cd /tmp/cbng-core && ./create_bayes_db data/bayes.db data/main_bayes_train.dat",
+                "./create_bayes_db data/bayes.db data/main_bayes_train.dat",
                 f'upload_file "data/bayes.db" "{upload_files_url}/bayes.db"',
             ],
         )
@@ -167,17 +170,16 @@ class Steps:
         success, logs = run_job(
             target_user=self.toolforge_user,
             job_name=clean_job_name(self.target_name, postfix="create-two-bayes-db"),
-            image_name=self.image_name,
-            release_ref=self.release_ref,
-            download_edit_set_url=download_edit_set_url,
-            skip_binary_setup=True,
-            override_file_urls={
+            image_name=self.core_image_name,
+            download_file_urls={
+                # Produced by store_edit_sets
+                "edits.xml": download_edit_set_url,
                 # Produced by `run_bayes_train`
                 "data/two_bayes_train.dat": f"{upload_files_url}/two_bayes_train.dat",
             },
             run_commands=[
                 'echo "Executing create_bayes_db"',
-                "cd /tmp/cbng-core && ./create_bayes_db data/two_bayes.db data/two_bayes_train.dat",
+                "./create_bayes_db data/two_bayes.db data/two_bayes_train.dat",
                 f'upload_file "data/two_bayes.db" "{upload_files_url}/two_bayes.db"',
             ],
         )
@@ -192,18 +194,18 @@ class Steps:
         success, logs = run_job(
             target_user=self.toolforge_user,
             job_name=clean_job_name(self.target_name, postfix="ann-train"),
-            image_name=self.image_name,
-            release_ref=self.release_ref,
-            download_edit_set_url=download_edit_set_url,
-            skip_binary_setup=True,
-            override_file_urls={
+            image_name=self.core_image_name,
+            download_file_urls={
+                # Produced by store_edit_sets
+                "edits.xml": download_edit_set_url,
                 # Produced by `create_main_bayes_db` & `create_two_bayes_db`
                 "data/bayes.db": f"{upload_files_url}/bayes.db",
                 "data/two_bayes.db": f"{upload_files_url}/two_bayes.db",
             },
             run_commands=[
                 'echo "Executing ann_train"',
-                "cd /tmp/cbng-core && ./cluebotng -c conf -m ann_train -f edits.xml",
+                "sed -i s'/, \"train_outputs\"//g' conf/cluebotng.conf",
+                "./cluebotng -c conf -m ann_train -f edits.xml",
                 f'upload_file "data/main_ann_train.dat" "{upload_files_url}/main_ann_train.dat"',
             ],
         )
@@ -218,17 +220,16 @@ class Steps:
         success, logs = run_job(
             target_user=self.toolforge_user,
             job_name=clean_job_name(self.target_name, postfix="create-ann"),
-            image_name=self.image_name,
-            release_ref=self.release_ref,
-            download_edit_set_url=download_edit_set_url,
-            skip_binary_setup=True,
-            override_file_urls={
+            image_name=self.core_image_name,
+            download_file_urls={
+                # Produced by store_edit_sets
+                "edits.xml": download_edit_set_url,
                 # Produced by `run_ann_train`
                 "data/main_ann_train.dat": f"{upload_files_url}/main_ann_train.dat",
             },
             run_commands=[
                 'echo "Executing create_ann"',
-                "cd /tmp/cbng-core && ./create_ann data/main_ann.fann data/main_ann_train.dat 150 0.037 100",
+                "./create_ann data/main_ann.fann data/main_ann_train.dat 150 0.037 100",
                 f'upload_file "data/main_ann.fann" "{upload_files_url}/main_ann.fann"',
             ],
         )
@@ -238,12 +239,12 @@ class Steps:
     def run_trial_report(
         self,
         download_edit_set_url: str,
-        download_bins_url: str,
         upload_report_url: str,
     ) -> bool:
         run_commands = [
             'echo "Executing trial_run"',
-            "cd /tmp/cbng-core && mkdir trialreport/ && ./cluebotng -c conf -m trial_run -f edits.xml",
+            "test -d trialreport/ || mkdir trialreport/",
+            "./cluebotng -c conf -m trial_run -f edits.xml",
         ]
         for file_name in [
             "debug.xml",
@@ -258,10 +259,8 @@ class Steps:
         success, logs = run_job(
             target_user=self.toolforge_user,
             job_name=clean_job_name(self.target_name, postfix="trial-report"),
-            image_name=self.image_name,
-            release_ref=self.release_ref,
-            download_bins_url=download_bins_url,
-            download_edit_set_url=download_edit_set_url,
+            image_name=self.core_image_name,
+            download_file_urls={"edits.xml": download_edit_set_url},
             run_commands=run_commands,
         )
         self._upload_logs("trial-report", logs)
@@ -275,11 +274,9 @@ class Steps:
         }.items():
             run_commands.extend(
                 [
-                    "cd /tmp/cbng-core/trialreport",
-                    "set +e",
                     f'base64 -d <<<{base64.b64encode(plot.encode("utf-8")).decode("utf-8")} > {name}.gnuplot',
                     f'echo "Generating plot for {name}"',
-                    f"gnuplot-qt {name}.gnuplot",
+                    f"launcher gnuplot-qt {name}.gnuplot",
                     (
                         f'if [ -s "{name}.gnuplot" ] && [ -s "{name}.png" ]; then'
                         f'  upload_file "{name}.gnuplot" "{upload_report_url}/{name}.gnuplot";'
@@ -293,12 +290,12 @@ class Steps:
         success, logs = run_job(
             target_user=self.toolforge_user,
             job_name=clean_job_name(self.target_name, postfix="create-plots"),
-            image_name=self.image_name,
-            skip_setup=True,
-            override_file_urls={
-                "trialreport/thresholdtable.txt": f"{upload_report_url}/thresholdtable.txt",
+            image_name=self.trainer_image_name,  # Note: trainer image for gnuplot rather than core image
+            download_file_urls={
+                "thresholdtable.txt": f"{upload_report_url}/thresholdtable.txt",
             },
             run_commands=run_commands,
+            configure_upload_file_helper=True,
         )
         self._upload_logs("create-plots", logs)
         return success
