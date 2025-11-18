@@ -18,7 +18,7 @@ tox = "4.32.0"
 tox-current-env = "0.0.16"
 black = "25.11.0"
 ruff = "0.14.4"
-bandit = "1.8.6"
+bandit = "1.9.1"
 
 [tool.ruff]
 exclude = ['*/migrations/*', 've/*', '.tox/*']
