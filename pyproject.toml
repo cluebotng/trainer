@@ -17,7 +17,7 @@ dependencies = [
 tox = "4.32.0"
 tox-current-env = "0.0.16"
 black = "25.11.0"
-ruff = "0.14.4"
+ruff = "0.14.6"
 bandit = "1.8.6"
 
 [tool.ruff]
