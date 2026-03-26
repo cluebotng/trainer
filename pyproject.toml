@@ -14,11 +14,11 @@ dependencies = [
 ]
 
 [tool.poetry.group.test.dependencies]
-tox = "4.50.3"
-tox-current-env = "0.0.16"
-black = "25.11.0"
-ruff = "0.15.7"
-bandit = "1.8.6"
+tox = "*"
+tox-current-env = "*"
+black = "*"
+ruff = "*"
+bandit = "*"
 
 [tool.ruff]
 exclude = ['*/migrations/*', 've/*', '.tox/*']
