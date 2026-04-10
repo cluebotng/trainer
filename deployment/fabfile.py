@@ -18,9 +18,16 @@ c = Connection(
 @task
 def setup_secrets(_ctx):
     # Copy the kubernetes config into envvars
-    config = yaml.load(c.sudo(f"cat {TOOL_DIR / '.kube' / 'config'}", hide="stdout").stdout.strip(),
-                       Loader=yaml.SafeLoader)
+    config = yaml.load(
+        c.sudo(f"cat {TOOL_DIR / '.kube' / 'config'}", hide="stdout").stdout.strip(), Loader=yaml.SafeLoader
+    )
 
-    c.sudo(f"XDG_CONFIG_HOME={TOOL_DIR} toolforge envvars create K8S_SERVER {config['clusters'][0]['cluster']['server']} > /dev/null")
-    c.sudo(f"bash -c 'XDG_CONFIG_HOME={TOOL_DIR} toolforge envvars create K8S_CLIENT_CRT < {(TOOL_DIR / '.toolskube' / 'client.crt').as_posix()}' > /dev/null")
-    c.sudo(f"bash -c 'XDG_CONFIG_HOME={TOOL_DIR} toolforge envvars create K8S_CLIENT_KEY < {(TOOL_DIR / '.toolskube' / 'client.key').as_posix()}' > /dev/null")
+    c.sudo(
+        f"XDG_CONFIG_HOME={TOOL_DIR} toolforge envvars create K8S_SERVER {config['clusters'][0]['cluster']['server']} > /dev/null"
+    )
+    c.sudo(
+        f"bash -c 'XDG_CONFIG_HOME={TOOL_DIR} toolforge envvars create K8S_CLIENT_CRT < {(TOOL_DIR / '.toolskube' / 'client.crt').as_posix()}' > /dev/null"
+    )
+    c.sudo(
+        f"bash -c 'XDG_CONFIG_HOME={TOOL_DIR} toolforge envvars create K8S_CLIENT_KEY < {(TOOL_DIR / '.toolskube' / 'client.key').as_posix()}' > /dev/null"
+    )

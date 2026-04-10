@@ -22,6 +22,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
+
 import base64
 import logging
 import os
@@ -93,7 +94,7 @@ class Steps:
     def store_edit_sets(self, mapping: Dict[str, str]) -> bool:
         commands = []
         for download_url, upload_url in mapping.items():
-            tmp_path = f"/tmp/{uuid.uuid4().hex}"
+            tmp_path = f"/tmp/{uuid.uuid4().hex}"  # nosec: B108
             commands.extend(
                 [
                     f"echo \"Downloading '{download_url}' to '{tmp_path}'\"",

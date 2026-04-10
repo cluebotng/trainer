@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-'''
+"""
 MIT License
 
 Copyright (c) 2025 Damian Zaremba
@@ -21,23 +21,24 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-'''
+"""
+
 from pathlib import Path
 
 from setuptools import setup, find_packages
 
-with Path('README.md').open('r') as fh:
+with Path("README.md").open("r") as fh:
     long_description = fh.read()
 
 setup(
-    name='cbng-trainer',
-    description='ClueBot NG training utilities',
+    name="cbng-trainer",
+    description="ClueBot NG training utilities",
     long_description=long_description,
-    long_description_content_type='text/markdown',
-    url='https://github.com/cluebotng/trainer',
+    long_description_content_type="text/markdown",
+    url="https://github.com/cluebotng/trainer",
     packages=find_packages(),
-    license='MIT',
-    platforms='any',
+    license="MIT",
+    platforms="any",
     install_requires=[
         "click",
         "kubernetes",
@@ -47,13 +48,11 @@ setup(
         "toolforge_weld",
     ],
     entry_points={
-        'console_scripts': [
-            'cbng-trainer=cbng_trainer.cli:cli'
-        ],
+        "console_scripts": ["cbng-trainer=cbng_trainer.cli:cli"],
     },
     classifiers=[
-        'Programming Language :: Python :: 3',
-        'Operating System :: OS Independent',
+        "Programming Language :: Python :: 3",
+        "Operating System :: OS Independent",
     ],
-    python_requires='>=3.9',
+    python_requires=">=3.9",
 )
