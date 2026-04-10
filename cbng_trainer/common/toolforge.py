@@ -159,10 +159,10 @@ def run_job(
     execution_script = generate_execution_script(
         download_file_urls=download_file_urls,
         run_commands=run_commands,
-        configure_upload_file_helper=configure_upload_file_helper is True or (
-            configure_upload_file_helper is None and any(
-                [run_command.strip().startswith("upload_file") for run_command in run_commands]
-            )
+        configure_upload_file_helper=configure_upload_file_helper is True
+        or (
+            configure_upload_file_helper is None
+            and any([run_command.strip().startswith("upload_file") for run_command in run_commands])
         ),
     )
 
