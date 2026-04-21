@@ -4,6 +4,8 @@ schema-version = "0.2"
 [com.heroku.buildpacks.deb-packages]
 install = [
     "gnuplot",
+    { name = "libpcre2-16-0", force = true },
+    { name = "libpcre2-32-0", force = true },
 ]
 
 [[com.heroku.buildpacks.deb-packages.sources]]
