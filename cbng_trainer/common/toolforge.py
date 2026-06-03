@@ -1,3 +1,4 @@
+import functools
 import logging
 import re
 import time
@@ -15,6 +16,7 @@ from cbng_trainer.common.utils import generate_execution_script, generate_comman
 logger = logging.getLogger(__name__)
 
 
+@functools.lru_cache(maxsize=None)
 def _client_config(target_user: str):
     config = load_config(target_user)
     return ToolforgeClient(
@@ -129,13 +131,15 @@ def _wait_for_logs_end_marker(
     target_user: str, job_name: str, start_time: datetime, seen_logs: List[Tuple[datetime, str]], timeout: int = 300
 ):
     waiting_start_time = time.time()
+    checked_up_to = 0
     while True:
         _peak_at_logs(target_user, job_name, start_time, seen_logs)
 
-        for timestamp, line in seen_logs:
+        for _, line in seen_logs[checked_up_to:]:
             if line.strip().endswith(f": {JOB_LOGS_END_MARKER}"):
                 logger.info(f"[{job_name}] Found log end marker")
                 return
+        checked_up_to = len(seen_logs)
 
         if waiting_start_time + timeout < time.time():
             logger.error(f"[{job_name}] Timed out before log end marker")
@@ -162,7 +166,8 @@ def run_job(
         configure_upload_file_helper=configure_upload_file_helper is True
         or (
             configure_upload_file_helper is None
-            and any([run_command.strip().startswith("upload_file") for run_command in run_commands])
+            and run_commands is not None
+            and any(run_command.strip().startswith("upload_file") for run_command in run_commands)
         ),
     )
 

@@ -99,7 +99,7 @@ function upload_file() {
         for path, url in download_file_urls.items():
             target_path = (base_dir / path).absolute()
 
-            if target_path.parent.relative_to(base_dir) != ".":
+            if target_path.parent != base_dir:
                 setup_script += "# Ensure the target directory exists\n"
                 setup_script += f"test -d '{target_path.parent.as_posix()}' ||"
                 setup_script += f"mkdir -p '{target_path.parent.as_posix()}'\n"
@@ -130,6 +130,5 @@ def clean_job_name(name: str, prefix: Optional[str] = None, postfix: Optional[st
     if postfix:
         job_name = f"{job_name}-{postfix}"
     job_name = re.sub(r"[^A-Za-z0-9]", "-", job_name).lower()
-    while "--" in job_name:
-        job_name = job_name.replace("--", "")
+    job_name = re.sub(r"-{2,}", "-", job_name)
     return job_name[0:50]

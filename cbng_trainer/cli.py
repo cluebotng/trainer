@@ -25,6 +25,7 @@ SOFTWARE.
 
 import logging
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import Optional, List
 
@@ -92,34 +93,38 @@ def run_edit_set(
         return
 
     # Build
+    artifacts_url = calculate_target_path(trainer_host, target_name, instance_name, "artifacts")
     logger.info("Running bayes train")
     if not steps.run_bayes_train(
         download_edit_set_url=files_to_download[download_training],
-        upload_files_url=calculate_target_path(trainer_host, target_name, instance_name, "artifacts"),
+        upload_files_url=artifacts_url,
     ):
         logger.error("Bayes train failed")
         return
 
     logger.info("Creating bayes databases")
-    if not steps.create_main_bayes_db(
-        download_edit_set_url=files_to_download[download_training],
-        upload_files_url=calculate_target_path(trainer_host, target_name, instance_name, "artifacts"),
-    ):
-        logger.error("Main main bayes db failed")
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        main_bayes_future = executor.submit(
+            steps.create_main_bayes_db,
+            download_edit_set_url=files_to_download[download_training],
+            upload_files_url=artifacts_url,
+        )
+        two_bayes_future = executor.submit(
+            steps.create_two_bayes_db,
+            download_edit_set_url=files_to_download[download_training],
+            upload_files_url=artifacts_url,
+        )
+    if not main_bayes_future.result():
+        logger.error("Main bayes db failed")
         return
-
-    logger.info("Creating two bayes databases")
-    if not steps.create_two_bayes_db(
-        download_edit_set_url=files_to_download[download_training],
-        upload_files_url=calculate_target_path(trainer_host, target_name, instance_name, "artifacts"),
-    ):
+    if not two_bayes_future.result():
         logger.error("Two bayes db failed")
         return
 
     logger.info("Running ann train")
     if not steps.run_ann_train(
         download_edit_set_url=files_to_download[download_training],
-        upload_files_url=calculate_target_path(trainer_host, target_name, instance_name, "artifacts"),
+        upload_files_url=artifacts_url,
     ):
         logger.error("Ann train failed")
         return
@@ -127,7 +132,7 @@ def run_edit_set(
     logger.info("Running ann create")
     if not steps.run_create_ann(
         download_edit_set_url=files_to_download[download_training],
-        upload_files_url=calculate_target_path(trainer_host, target_name, instance_name, "artifacts"),
+        upload_files_url=artifacts_url,
     ):
         logger.error("Ann create failed")
         return
