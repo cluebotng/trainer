@@ -158,7 +158,7 @@ def run_job(
     run_timeout: int = 7200,
     start_timeout: int = 300,
     wait_for_job_logs_marker: bool = True,
-    configure_upload_file_helper: bool = None,
+    configure_upload_file_helper: bool | None = None,
 ) -> Tuple[bool, List[Tuple[datetime, str]]]:
     execution_script = generate_execution_script(
         download_file_urls=download_file_urls,

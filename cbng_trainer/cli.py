@@ -195,10 +195,13 @@ def run_edit_sets(
 
     targets = []
     for target_name, groups in target_groups.items():
-        if ("Training" in groups or "Reported False Positives" in groups) and "Trial" not in groups:
-            if group_id := target_groups.get("Original Testing Training Set - Random Edits 50/50", {}).get("Trial"):
-                logger.info(f"Using original training set as fallback trial group for {target_name}")
-                groups["Trial"] = group_id
+        if (
+            ("Training" in groups or "Reported False Positives" in groups)
+            and "Trial" not in groups
+            and (group_id := target_groups.get("Original Testing Training Set - Random Edits 50/50", {}).get("Trial"))
+        ):
+            logger.info(f"Using original training set as fallback trial group for {target_name}")
+            groups["Trial"] = group_id
 
         for group_name, group_id in groups.items():
             # We will use the training set, no need to download the redundant file
