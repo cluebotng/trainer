@@ -26,18 +26,17 @@ SOFTWARE.
 import logging
 import sys
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
-from typing import Optional, List
+from datetime import UTC, datetime
 
 import click
 from toolforge_weld.kubernetes_config import Kubeconfig
 
 from cbng_trainer.common.files import calculate_target_path
 from cbng_trainer.common.steps import Steps
-from cbng_trainer.common.toolforge import run_job, create_or_update_envvar
+from cbng_trainer.common.toolforge import create_or_update_envvar, run_job
 from cbng_trainer.common.utils import (
-    get_target_edit_groups,
     clean_job_name,
+    get_target_edit_groups,
 )
 
 logger = logging.getLogger(__name__)
@@ -68,7 +67,7 @@ def run_edit_set(
     core_image_name: str,
     trainer_host: str,
     download_training: str,
-    download_trial: Optional[str],
+    download_trial: str | None,
 ) -> None:
     steps = Steps(
         toolforge_user=toolforge_user,
@@ -171,7 +170,7 @@ def run_edit_set(
 )
 @click.option("--trainer-host", default="http://file-api.tool-cluebotng-trainer.svc.tools.local:8000", required=True)
 def run_edit_sets(
-    edit_set: List[str],
+    edit_set: list[str],
     print_only: bool,
     copy_credentials: bool,
     toolforge_user: str,
@@ -191,7 +190,7 @@ def run_edit_sets(
 
     target_groups = get_target_edit_groups(review_host, edit_set)
 
-    run_instance = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    run_instance = datetime.now(tz=UTC).strftime("%Y-%m-%d %H:%M:%S")
 
     targets = []
     for target_name, groups in target_groups.items():
@@ -238,7 +237,7 @@ def run_edit_sets(
 
             if print_only:
                 print(" ".join(script))
-                print("")
+                print()
             else:
                 targets.append(
                     (

@@ -25,14 +25,13 @@ SOFTWARE.
 import base64
 import re
 from pathlib import PosixPath
-from typing import Dict, List, Optional
 
 import requests
 
 from cbng_trainer.common.consts import JOB_LOGS_END_MARKER
 
 
-def get_target_edit_groups(review_host: str, filter_edit_set: List[str]) -> Dict[str, Dict[str, int]]:
+def get_target_edit_groups(review_host: str, filter_edit_set: list[str]) -> dict[str, dict[str, int]]:
     r = requests.get(f"{review_host}/api/v1/edit-groups/", params={"exclude_empty_editsets": "1"}, timeout=10)
     r.raise_for_status()
     data = r.json()
@@ -53,8 +52,8 @@ def get_target_edit_groups(review_host: str, filter_edit_set: List[str]) -> Dict
 
 
 def generate_execution_script(
-    download_file_urls: Optional[Dict[str, str]] = None,
-    run_commands: Optional[List[str]] = None,
+    download_file_urls: dict[str, str] | None = None,
+    run_commands: list[str] | None = None,
     configure_upload_file_helper: bool = False,
 ) -> str:
     setup_script = "#!/bin/bash\n"
@@ -123,7 +122,7 @@ def generate_command_command(setup_script: str, run_timeout: int) -> str:
     )
 
 
-def clean_job_name(name: str, prefix: Optional[str] = None, postfix: Optional[str] = None) -> str:
+def clean_job_name(name: str, prefix: str | None = None, postfix: str | None = None) -> str:
     job_name = name
     if prefix:
         job_name = f"{prefix}-{job_name}"

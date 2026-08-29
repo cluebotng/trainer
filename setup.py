@@ -25,7 +25,7 @@ SOFTWARE.
 
 from pathlib import Path
 
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 with Path("README.md").open("r") as fh:
     long_description = fh.read()

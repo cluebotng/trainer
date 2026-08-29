@@ -1,4 +1,3 @@
-from typing import Optional
 from urllib.parse import quote
 
 
@@ -7,7 +6,7 @@ def calculate_target_path(
     target_group: str,
     target_instance: str,
     target_type: str,
-    target_file: Optional[str] = None,
+    target_file: str | None = None,
 ) -> str:
     endpoint = f'{base_url.rstrip("/")}'
     endpoint += f"/{quote(target_group)}/{quote(target_instance)}/{quote(target_type)}"
