@@ -28,14 +28,13 @@ import logging
 import os
 import uuid
 from datetime import datetime
-from typing import Dict, List, Tuple
 
 import requests
 
 from cbng_trainer.common.consts import (
-    THREASHOLDS_PLOT,
     FALSE_POSITIVES_PLOT,
     JOB_LOGS_END_MARKER,
+    THREASHOLDS_PLOT,
 )
 from cbng_trainer.common.toolforge import run_job
 from cbng_trainer.common.utils import clean_job_name
@@ -59,7 +58,7 @@ class Steps:
         self.upload_logs = upload_logs
         self._file_api_key = os.environ.get("FILE_API_KEY", "")
 
-    def _clean_log_lines(self, logs: List[Tuple[datetime, str]]) -> List[str]:
+    def _clean_log_lines(self, logs: list[tuple[datetime, str]]) -> list[str]:
         clean_lines = []
         for _, line in sorted(logs, key=lambda x: (x[0], x[1])):
             # Remove the internal marker
@@ -74,7 +73,7 @@ class Steps:
 
         return clean_lines
 
-    def _upload_logs(self, identifier: str, logs: List[Tuple[datetime, str]]) -> None:
+    def _upload_logs(self, identifier: str, logs: list[tuple[datetime, str]]) -> None:
         if not logs:
             logger.debug(f"No logs to upload for {identifier}")
             return
@@ -96,7 +95,7 @@ class Steps:
         if r.status_code != 201:
             logger.warning(f"Failed to upload logs for {identifier}: {r.status_code} ({r.text})")
 
-    def store_edit_sets(self, mapping: Dict[str, str]) -> bool:
+    def store_edit_sets(self, mapping: dict[str, str]) -> bool:
         commands = []
         for download_url, upload_url in mapping.items():
             tmp_path = f"/tmp/{uuid.uuid4().hex}"  # nosec: B108

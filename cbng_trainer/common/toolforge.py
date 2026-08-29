@@ -2,8 +2,8 @@ import functools
 import logging
 import re
 import time
-from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict, List, Any, Tuple, Union
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from requests.exceptions import HTTPError, ReadTimeout
 from toolforge_weld.api_client import ToolforgeClient
@@ -11,12 +11,12 @@ from toolforge_weld.config import load_config
 from toolforge_weld.kubernetes_config import Kubeconfig
 
 from cbng_trainer.common.consts import JOB_LOGS_END_MARKER
-from cbng_trainer.common.utils import generate_execution_script, generate_command_command
+from cbng_trainer.common.utils import generate_command_command, generate_execution_script
 
 logger = logging.getLogger(__name__)
 
 
-@functools.lru_cache(maxsize=None)
+@functools.cache
 def _client_config(target_user: str):
     config = load_config(target_user)
     return ToolforgeClient(
@@ -80,7 +80,7 @@ def _job_is_running(target_user: str, name: str) -> bool:
     return "Running for " in resp["job"]["status_short"]
 
 
-def _wait_for_job_to_start(target_user: str, job_name: str) -> Optional[Union[datetime, bool]]:
+def _wait_for_job_to_start(target_user: str, job_name: str) -> datetime | bool | None:
     api = _client_config(target_user)
     try:
         resp = api.get(f"/jobs/v1/tool/{target_user}/jobs/{job_name}/")
@@ -97,7 +97,7 @@ def _wait_for_job_to_start(target_user: str, job_name: str) -> Optional[Union[da
     return None
 
 
-def _read_logs(target_user: str, job_name: str, start_time: datetime) -> List[Dict[str, Any]]:
+def _read_logs(target_user: str, job_name: str, start_time: datetime) -> list[dict[str, Any]]:
     api = _client_config(target_user)
 
     logs = []
@@ -113,7 +113,7 @@ def _read_logs(target_user: str, job_name: str, start_time: datetime) -> List[Di
     return logs
 
 
-def _peak_at_logs(target_user: str, job_name: str, start_time: datetime, seen_logs: List[Tuple[datetime, str]]):
+def _peak_at_logs(target_user: str, job_name: str, start_time: datetime, seen_logs: list[tuple[datetime, str]]):
     for log in _read_logs(target_user, job_name, start_time):
         # Work around T410055
         if log["pod"] == "nopod" and log["container"] == "nocontainer":
@@ -128,7 +128,7 @@ def _peak_at_logs(target_user: str, job_name: str, start_time: datetime, seen_lo
 
 
 def _wait_for_logs_end_marker(
-    target_user: str, job_name: str, start_time: datetime, seen_logs: List[Tuple[datetime, str]], timeout: int = 300
+    target_user: str, job_name: str, start_time: datetime, seen_logs: list[tuple[datetime, str]], timeout: int = 300
 ):
     waiting_start_time = time.time()
     checked_up_to = 0
@@ -152,14 +152,14 @@ def run_job(
     target_user: str,
     job_name: str,
     image_name: str,
-    download_file_urls: Optional[Dict[str, str]] = None,
-    run_commands: Optional[List[str]] = None,
+    download_file_urls: dict[str, str] | None = None,
+    run_commands: list[str] | None = None,
     wait_for_completion: bool = True,
     run_timeout: int = 7200,
     start_timeout: int = 300,
     wait_for_job_logs_marker: bool = True,
     configure_upload_file_helper: bool | None = None,
-) -> Tuple[bool, List[Tuple[datetime, str]]]:
+) -> tuple[bool, list[tuple[datetime, str]]]:
     execution_script = generate_execution_script(
         download_file_urls=download_file_urls,
         run_commands=run_commands,
@@ -172,7 +172,7 @@ def run_job(
     )
 
     logger.info(f"[{job_name}] Creating job")
-    job_request_time = datetime.now(timezone.utc)
+    job_request_time = datetime.now(UTC)
     if not _run_job(
         target_user=target_user,
         job_name=job_name,
@@ -185,7 +185,7 @@ def run_job(
         return True, []
 
     logger.info(f"[{job_name}] Waiting for job to start")
-    waiting_start_time = datetime.now(tz=timezone.utc)
+    waiting_start_time = datetime.now(tz=UTC)
     while True:
         start_time = _wait_for_job_to_start(
             target_user=target_user,
@@ -195,7 +195,7 @@ def run_job(
         if start_time is not None:
             break
 
-        if waiting_start_time + timedelta(seconds=start_timeout) < datetime.now(tz=timezone.utc):
+        if waiting_start_time + timedelta(seconds=start_timeout) < datetime.now(tz=UTC):
             logger.error(f"[{job_name}] Job failed to start within timeout")
             return False, []
 
