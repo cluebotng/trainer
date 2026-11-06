@@ -29,11 +29,10 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 
 import click
-from toolforge_weld.kubernetes_config import Kubeconfig
 
 from cbng_trainer.common.files import calculate_target_path
 from cbng_trainer.common.steps import Steps
-from cbng_trainer.common.toolforge import create_or_update_envvar, run_job
+from cbng_trainer.common.toolforge import create_or_update_envvar, load_kube_config, run_job
 from cbng_trainer.common.utils import (
     clean_job_name,
     get_target_edit_groups,
@@ -180,12 +179,12 @@ def run_edit_sets(
     trainer_host: str,
 ) -> None:
     if copy_credentials and not print_only:
-        kubeconfig = Kubeconfig.load()
+        kube_config = load_kube_config()
 
-        with kubeconfig.client_cert_file.open("r") as fh:
+        with kube_config.client_cert_file.open("r") as fh:
             create_or_update_envvar(toolforge_user, "K8S_CLIENT_CRT", fh.read())
 
-        with kubeconfig.client_key_file.open("r") as fh:
+        with kube_config.client_key_file.open("r") as fh:
             create_or_update_envvar(toolforge_user, "K8S_CLIENT_KEY", fh.read())
 
     target_groups = get_target_edit_groups(review_host, edit_set)

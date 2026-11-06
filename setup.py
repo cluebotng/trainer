@@ -42,10 +42,10 @@ setup(
     install_requires=[
         "click",
         "kubernetes",
+        "pyyaml",
         "requests",
         "aiohttp",
         "aiohttp-retry",
-        "toolforge_weld",
     ],
     entry_points={
         "console_scripts": ["cbng-trainer=cbng_trainer.cli:cli"],
@@ -54,5 +54,5 @@ setup(
         "Programming Language :: Python :: 3",
         "Operating System :: OS Independent",
     ],
-    python_requires=">=3.9",
+    python_requires=">=3.15",
 )

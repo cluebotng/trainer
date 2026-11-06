@@ -2,14 +2,14 @@
 name = "cbng-trainer"
 version = "1.0.0"
 readme = "README.md"
-requires-python = ">=3.12" # T408108
+requires-python = ">=3.15"
 dependencies = [
     "click",
     "kubernetes",
+    "pyyaml",
     "requests",
     "aiohttp",
     "aiohttp-retry",
-    "toolforge_weld",
     "gunicorn",
 ]
 

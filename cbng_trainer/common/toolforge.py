@@ -1,28 +1,82 @@
 import functools
 import logging
+import os
 import re
 import time
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
+import requests
+import urllib3
+import yaml
 from requests.exceptions import HTTPError, ReadTimeout
-from toolforge_weld.api_client import ToolforgeClient
-from toolforge_weld.config import load_config
-from toolforge_weld.kubernetes_config import Kubeconfig
 
 from cbng_trainer.common.consts import JOB_LOGS_END_MARKER
 from cbng_trainer.common.utils import generate_command_command, generate_execution_script
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_API_GATEWAY_URL = "https://api.svc.tools.eqiad1.wikimedia.cloud:30003"
+
+
+@dataclass(frozen=True)
+class KubeConfig:
+    client_cert_file: Path
+    client_key_file: Path
+
+
+def _resolve_path(base: Path, path: str) -> Path:
+    resolved = Path(path).expanduser()
+    return resolved if resolved.is_absolute() else (base / resolved).resolve()
+
 
 @functools.cache
-def _client_config(target_user: str):
-    config = load_config(target_user)
+def load_kube_config() -> KubeConfig:
+    path = Path(os.environ.get("KUBECONFIG", "~/.kube/config")).expanduser()
+    data = yaml.safe_load(path.read_text())
+
+    context = next(c["context"] for c in data["contexts"] if c["name"] == data["current-context"])
+    user = next(u["user"] for u in data["users"] if u["name"] == context["user"])
+    return KubeConfig(
+        client_cert_file=_resolve_path(path.parent, user["client-certificate"]),
+        client_key_file=_resolve_path(path.parent, user["client-key"]),
+    )
+
+
+class ToolforgeClient:
+    def __init__(self, server: str, kube_config: KubeConfig, timeout: int = 20):
+        self.server = server.rstrip("/")
+        self.timeout = timeout
+        self.session = requests.Session()
+        self.session.headers["User-Agent"] = "ClueBot NG Trainer"
+        self.session.cert = (str(kube_config.client_cert_file), str(kube_config.client_key_file))
+        # The API gateway certificate is not signed by the kubeconfig CA (T253412)
+        self.session.verify = False
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+    def _request(self, method: str, url: str, **kwargs) -> dict[str, Any]:
+        kwargs.setdefault("timeout", self.timeout)
+        response = self.session.request(method, f"{self.server}/{url.lstrip('/')}", **kwargs)
+        response.raise_for_status()
+        return response.json()
+
+    def get(self, url: str, **kwargs) -> dict[str, Any]:
+        return self._request("GET", url, **kwargs)
+
+    def post(self, url: str, **kwargs) -> dict[str, Any]:
+        return self._request("POST", url, **kwargs)
+
+    def delete(self, url: str, **kwargs) -> dict[str, Any]:
+        return self._request("DELETE", url, **kwargs)
+
+
+@functools.cache
+def _client_config(target_user: str) -> ToolforgeClient:
     return ToolforgeClient(
-        server=f"{config.api_gateway.url}",
-        kubeconfig=Kubeconfig.load(),
-        user_agent="ClueBot NG Trainer",
+        server=os.environ.get("TOOL_TOOLFORGE_API_URL", DEFAULT_API_GATEWAY_URL),
+        kube_config=load_kube_config(),
     )
 
 
