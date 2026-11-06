@@ -12,7 +12,7 @@ jobs:
   update-components:
     runs-on: ubuntu-latest
     steps:
-      - uses: cluebotng/ci-update-component-ref@532f2d7b6eb16d1799bc051e4404a420609caac2 # main
+      - uses: cluebotng/ci-update-component-ref@532f2d7b6eb16d1799bc051e4404a420609caac2 # v1.3.0
         with:
           tool: 'cluebotng-trainer'
           component: 'coordinator'
