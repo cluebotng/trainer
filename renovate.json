@@ -18,5 +18,8 @@
       "groupName": "Python dependencies"
     }
   ],
-  "ignoreTests": true
+  "ignoreTests": true,
+  "lockFileMaintenance": {
+    "enabled": true
+  }
 }
